@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
+
+const themeScript = `(function(){var t=localStorage.getItem("theme");var d=!t&&window.matchMedia("(prefers-color-scheme: dark)").matches;if(t==="dark"||d)document.documentElement.classList.add("dark");else document.documentElement.classList.remove("dark");})();`;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,15 +28,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `(function(){var t=localStorage.getItem("theme");var d=!t&&window.matchMedia("(prefers-color-scheme: dark)").matches;if(t==="dark"||d)document.documentElement.classList.add("dark");else document.documentElement.classList.remove("dark");})();`,
-        }}
-      />
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <Script id="theme-init" strategy="beforeInteractive">
+          {themeScript}
+        </Script>
         {children}
+        <Analytics />
       </body>
     </html>
   );
