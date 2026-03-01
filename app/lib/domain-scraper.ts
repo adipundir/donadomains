@@ -9,6 +9,8 @@ export interface DomainRegistrationDetails {
   created?: string;
   expires?: string;
   registrant?: string;
+  /** Contact email or other contact from registrant entity (often redacted). */
+  contact?: string;
   status?: string[];
 }
 
@@ -82,6 +84,73 @@ function extractTld(domain: string): string {
   return parts.length > 1 ? `.${parts.slice(1).join(".")}` : "";
 }
 
+/** TLD without leading dot, e.g. "com" */
+function tldToKey(tld: string): string {
+  return tld.startsWith(".") ? tld.slice(1) : tld;
+}
+
+const IANA_BOOTSTRAP_URL = "https://data.iana.org/rdap/dns.json";
+const RDAP_DIRECT_TIMEOUT_MS = 3000;
+const RDAP_FALLBACK_TIMEOUT_MS = 5000;
+const RDAP_DETAILS_TIMEOUT_MS = 8000;
+
+let bootstrapCache: Map<string, string> | null = null;
+let bootstrapPromise: Promise<Map<string, string>> | null = null;
+
+/** Fallback RDAP bases for TLDs that may be missing from IANA bootstrap. Omit TLDs whose registry RDAP is known broken (e.g. .me rdap.nic.me does not resolve). */
+const RDAP_FALLBACK_TLDS: Record<string, string> = {
+  com: "https://rdap.verisign.com/com/v1/",
+  net: "https://rdap.verisign.com/net/v1/",
+  org: "https://rdap.publicinterestregistry.org/",
+};
+
+async function loadBootstrap(): Promise<Map<string, string>> {
+  if (bootstrapCache) return bootstrapCache;
+  if (bootstrapPromise) return bootstrapPromise;
+  bootstrapPromise = (async () => {
+    const map = new Map<string, string>(Object.entries(RDAP_FALLBACK_TLDS));
+    try {
+      const res = await fetch(IANA_BOOTSTRAP_URL, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) return map;
+      const data = (await res.json()) as { services?: [string[], string[]][] };
+      for (const [tlds, urls] of data.services ?? []) {
+        if (!Array.isArray(tlds) || !Array.isArray(urls)) continue;
+        for (let i = 0; i < tlds.length; i++) {
+          const tld = String(tlds[i]).toLowerCase();
+          const url = urls[i] ?? urls[0];
+          if (tld && url) {
+            const base = url.endsWith("/") ? url : `${url}/`;
+            map.set(tld, base);
+          }
+        }
+      }
+      bootstrapCache = map;
+      return map;
+    } catch {
+      return map;
+    }
+  })();
+  return bootstrapPromise;
+}
+
+/** Fetch RDAP for domain: try registry directly first; on failure (ENOTFOUND, timeout, etc.) retry with rdap.org. */
+async function rdapFetch(domain: string, timeoutMs: number): Promise<Response> {
+  const tldKey = tldToKey(extractTld(domain));
+  const bootstrap = await loadBootstrap();
+  const baseUrl = bootstrap.get(tldKey);
+  const directUrl = baseUrl ? `${baseUrl}domain/${domain}` : null;
+  const rdapOrgUrl = `https://rdap.org/domain/${domain}`;
+  const tryDirect = directUrl != null;
+  if (tryDirect) {
+    try {
+      return await fetch(directUrl, { signal: AbortSignal.timeout(timeoutMs) });
+    } catch {
+      // Registry unreachable (e.g. ENOTFOUND rdap.nic.me); fall back to rdap.org
+    }
+  }
+  return fetch(rdapOrgUrl, { signal: AbortSignal.timeout(Math.min(timeoutMs, RDAP_FALLBACK_TIMEOUT_MS)) });
+}
+
 async function checkDnsAvailability(domain: string): Promise<boolean> {
   try {
     await dnsResolve(domain);
@@ -95,7 +164,7 @@ async function checkDnsAvailability(domain: string): Promise<boolean> {
 
 async function checkRdapAvailability(domain: string): Promise<{ available: boolean; checked: boolean }> {
   try {
-    const res = await fetch(`https://rdap.org/domain/${domain}`, { signal: AbortSignal.timeout(8000) });
+    const res = await rdapFetch(domain, RDAP_DIRECT_TIMEOUT_MS);
     if (res.status === 404) return { available: true, checked: true };
     if (res.ok) return { available: false, checked: true };
     return { available: false, checked: false };
@@ -106,51 +175,111 @@ async function checkRdapAvailability(domain: string): Promise<{ available: boole
 
 async function fetchRdapDetails(domain: string): Promise<DomainRegistrationDetails | null> {
   try {
-    const res = await fetch(`https://rdap.org/domain/${domain}`, { signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return null;
-    const data = (await res.json()) as {
-      events?: Array<{ eventAction?: string; eventDate?: string }>;
-      entities?: Array<{ role?: string[]; vcardArray?: unknown[] }>;
-      status?: string[];
-    };
+    const res = await rdapFetch(domain, RDAP_DETAILS_TIMEOUT_MS);
+    if (!res.ok) {
+      console.log(`[RDAP details] ${domain} → HTTP ${res.status} (not ok)`);
+      return null;
+    }
+    const raw = (await res.json()) as Record<string, unknown>;
+    console.log(`[RDAP details] ${domain} → raw keys:`, Object.keys(raw));
+    if (Array.isArray(raw.events)) {
+      console.log(`[RDAP details] ${domain} → events:`, JSON.stringify(raw.events, null, 2));
+    } else {
+      console.log(`[RDAP details] ${domain} → events:`, raw.events);
+    }
+    if (Array.isArray(raw.entities)) {
+      console.log(`[RDAP details] ${domain} → entities (${raw.entities.length}):`, JSON.stringify(raw.entities, null, 2));
+    } else {
+      console.log(`[RDAP details] ${domain} → entities:`, raw.entities);
+    }
+    const data =
+      raw && typeof raw === "object" && Array.isArray((raw as { events?: unknown }).events)
+        ? (raw as { events?: Array<{ eventAction?: string; eventDate?: string }>; entities?: Array<{ role?: string[]; vcardArray?: unknown[] }>; status?: string[] })
+        : raw && typeof raw === "object" && raw.domain && typeof (raw.domain as object) === "object"
+          ? (raw.domain as { events?: Array<{ eventAction?: string; eventDate?: string }>; entities?: Array<{ role?: string[]; vcardArray?: unknown[] }>; status?: string[] })
+          : null;
+    if (!data) {
+      console.log(`[RDAP details] ${domain} → no data (events not at top level or domain)`);
+      return null;
+    }
     const out: DomainRegistrationDetails = {};
-    if (Array.isArray(data.events)) {
-      for (const e of data.events) {
-        const action = (e.eventAction ?? "").toLowerCase();
-        const date = e.eventDate;
-        if (!date) continue;
-        if (action === "registration") out.created = date;
-        else if (action === "expiration") out.expires = date;
-      }
+    const events = Array.isArray(data.events) ? data.events : [];
+    for (const e of events) {
+      const action = (e.eventAction ?? "").toLowerCase();
+      const date = e.eventDate;
+      if (!date || typeof date !== "string") continue;
+      if (action === "registration") out.created = date;
+      else if (action === "expiration" || action === "expiry") out.expires = date;
     }
     if (Array.isArray(data.status)) out.status = data.status;
-    if (Array.isArray(data.entities)) {
-      for (const ent of data.entities) {
-        const roles = (ent.role ?? []).map((r) => String(r).toLowerCase());
-        const name = parseVcardName(ent.vcardArray);
-        if (roles.includes("registrar") && name) out.registrar = name;
-        else if ((roles.includes("registrant") || roles.includes("registrant contact")) && name) out.registrant = name;
+    const entities = Array.isArray(data.entities) ? data.entities : [];
+    for (const ent of entities) {
+      const roleRaw = ent.role;
+      const roles: string[] = Array.isArray(roleRaw)
+        ? roleRaw.map((r) => String(r).toLowerCase())
+        : roleRaw != null
+          ? [String(roleRaw).toLowerCase()]
+          : [];
+      const vcard = parseVcard(ent.vcardArray);
+      const name = vcard.name || vcard.org || null;
+      if (!name && !vcard.email) continue;
+      if (roles.includes("registrar")) {
+        out.registrar = name || vcard.email || undefined;
+      } else if (
+        roles.includes("registrant") ||
+        roles.some((r) => r.includes("registrant"))
+      ) {
+        out.registrant = name || undefined;
+        if (vcard.email) out.contact = vcard.email;
       }
     }
+    const rawAny = raw as Record<string, unknown>;
+    if (!out.registrar && typeof rawAny.registrar === "string") out.registrar = rawAny.registrar;
+    if (!out.registrant && typeof rawAny.registrant === "string") out.registrant = rawAny.registrant;
+    console.log(`[RDAP details] ${domain} → parsed:`, JSON.stringify(out, null, 2));
     return Object.keys(out).length > 0 ? out : null;
-  } catch {
+  } catch (err) {
+    console.log(`[RDAP details] ${domain} → error:`, err);
     return null;
   }
 }
 
-function parseVcardName(vcardArray: unknown[] | undefined): string | null {
-  if (!Array.isArray(vcardArray) || vcardArray.length < 2) return null;
-  const props = vcardArray[1];
-  if (!Array.isArray(props)) return null;
-  for (const p of props) {
-    if (!Array.isArray(p) || p.length < 4) continue;
-    const key = String(p[0]).toLowerCase();
-    const val = p[3];
-    if ((key === "fn" || key === "org") && typeof val === "string" && val && !/redact|privacy|data withheld/i.test(val)) {
-      return val.trim();
-    }
+/** Extract a single string from jCard value (can be string or array). */
+function vcardVal(val: unknown): string | null {
+  if (typeof val === "string") {
+    const s = val.trim();
+    return s && !/redact|privacy|data withheld|not disclosed/i.test(s) ? s : null;
+  }
+  if (Array.isArray(val) && val.length > 0) {
+    const first = val[0];
+    return typeof first === "string" ? vcardVal(first) : null;
   }
   return null;
+}
+
+/** Parse jCard (vcardArray) into name, org, email. Handles various RDAP vCard shapes. */
+function parseVcard(vcardArray: unknown[] | undefined): { name: string | null; org: string | null; email: string | null } {
+  const out = { name: null as string | null, org: null as string | null, email: null as string | null };
+  if (!Array.isArray(vcardArray) || vcardArray.length < 2) return out;
+  const props = vcardArray[1];
+  if (!Array.isArray(props)) return out;
+  for (const p of props) {
+    if (!Array.isArray(p) || p.length < 2) continue;
+    const key = String(p[0]).toLowerCase();
+    const val = p.length >= 4 ? p[3] : p[2];
+    const str = vcardVal(val);
+    if (!str) continue;
+    if (key === "fn" || key === "nickname") out.name = str;
+    else if (key === "org") out.org = str;
+    else if (key === "email" || key === "tel") out.email = str;
+  }
+  if (!out.name && out.org) out.name = out.org;
+  return out;
+}
+
+function parseVcardName(vcardArray: unknown[] | undefined): string | null {
+  const v = parseVcard(vcardArray);
+  return v.name || v.org || v.email;
 }
 
 async function checkOneDomain(
@@ -245,11 +374,13 @@ export async function searchDomainsMultiSource(keyword: string): Promise<SearchD
   const taken = list.filter((r) => !r.available);
   if (taken.length > 0) {
     console.log(`[DomainFinder] Fetching registration details for ${taken.length} taken domain(s) via RDAP...`);
-    for (let i = 0; i < taken.length; i++) {
-      const details = await fetchRdapDetails(taken[i].domain);
+    const detailsResults = await Promise.all(taken.map((r) => fetchRdapDetails(r.domain)));
+    detailsResults.forEach((details, i) => {
       if (details) taken[i].registration = details;
-      if (i < taken.length - 1) await new Promise((r) => setTimeout(r, 1200));
-    }
+    });
+    taken.forEach((r, i) => {
+      console.log(`[DomainFinder] Taken domain #${i + 1} full object:\n${JSON.stringify(r, null, 2)}`);
+    });
   }
 
   const elapsed = Date.now() - startTime;

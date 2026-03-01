@@ -1,13 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { searchDomainsAction } from "./actions";
+
+function ThemeSwitcher() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const isDark = typeof window !== "undefined" && (localStorage.getItem("theme") === "dark" || (!localStorage.getItem("theme") && window.matchMedia("(prefers-color-scheme: dark)").matches));
+    setDark(!!isDark);
+    if (isDark) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
+  }, []);
+  const toggle = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  };
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      className="font-comic-title comic-btn px-3 py-2 text-lg bg-[var(--background)] text-[var(--foreground)] uppercase tracking-wide border-[3px] border-[var(--foreground)] transition-transform"
+      style={{ boxShadow: "4px 4px 0px var(--foreground)" }}
+      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+    >
+      {dark ? "☀ Light" : "🌙 Dark"}
+    </button>
+  );
+}
 
 interface DomainRegistrationDetails {
   registrar?: string;
   created?: string;
   expires?: string;
   registrant?: string;
+  contact?: string;
   status?: string[];
 }
 
@@ -95,23 +123,24 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-black flex flex-col">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex flex-col">
       {/* Dotted pattern background */}
       <div className="fixed inset-0 opacity-5 pointer-events-none halftone" />
 
+      {/* Navbar: contained content, logo left / theme right */}
+      <nav className="relative border-b border-current/10 py-4 px-6 sm:px-8 w-full">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-8">
+          <span className="font-comic-title text-2xl sm:text-3xl uppercase tracking-wide">Donadomains</span>
+          <ThemeSwitcher />
+        </div>
+      </nav>
+
       {/* Main content: vertically centered in the space above the footer */}
       <div className="relative flex-1 flex flex-col justify-center mx-auto max-w-3xl px-6 py-12 w-full">
-        {/* Header */}
-        <div className="mb-10 text-center">
-          <div className="inline-block relative mb-6">
-            <h1 className="text-5xl sm:text-6xl uppercase tracking-wide rotate-[-1deg]">
-              Agentic Domain Finder
-            </h1>
-            <div className="absolute -bottom-2 left-0 right-0 h-3 bg-black -skew-x-3" />
-          </div>
-        </div>
-
-        {/* Search Form */}
+        {/* Search section */}
+        <p className="text-center text-[var(--foreground)] font-comic-title text-xl sm:text-2xl uppercase tracking-wide mb-3">
+          Find your domain
+        </p>
         <form onSubmit={handleSearch} className="mb-10">
           <div className="flex flex-col gap-4 sm:flex-row">
             <div className="relative flex-1">
@@ -119,8 +148,8 @@ export default function Home() {
                 type="text"
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
-                placeholder="Type your domain name..."
-                className="font-comic-body w-full px-5 py-4 text-lg font-bold bg-white text-black placeholder-black/40 uppercase comic-border focus:outline-none focus:ring-0"
+                placeholder="e.g. myname or myname.com"
+                className="font-comic-body w-full px-5 py-4 text-lg font-bold bg-[var(--background)] text-[var(--foreground)] placeholder-[var(--foreground)]/25 uppercase comic-border focus:outline-none focus:ring-0"
                 disabled={loading}
               />
             </div>
@@ -128,7 +157,6 @@ export default function Home() {
               type="submit"
               disabled={loading}
               className="font-comic-title px-8 py-4 text-xl bg-black text-white uppercase comic-border comic-btn transition-all disabled:opacity-50 disabled:cursor-not-allowed tracking-wide"
-              style={{ boxShadow: "4px 4px 0px #000" }}
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -145,7 +173,7 @@ export default function Home() {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-8 p-4 bg-white comic-border text-center relative">
+          <div className="mb-8 p-4 bg-[var(--surface)] text-[var(--foreground)] comic-border text-center relative">
             <span className="font-comic-title text-xl uppercase">OOPS! </span>
             <span className="font-bold">{error}</span>
           </div>
@@ -154,7 +182,7 @@ export default function Home() {
         {/* Loading State */}
         {loading && (
           <div className="mb-8 text-center">
-            <div className="inline-block p-6 bg-white comic-border relative speech-bubble">
+            <div className="inline-block p-6 bg-[var(--surface)] text-[var(--foreground)] comic-border relative speech-bubble">
               <div className="flex items-center gap-3">
                 <span className="text-2xl animate-bounce">*</span>
                 <span className="font-comic-title text-xl uppercase tracking-wide">
@@ -162,21 +190,21 @@ export default function Home() {
                 </span>
                 <span className="text-2xl animate-bounce" style={{ animationDelay: "0.2s" }}>*</span>
               </div>
-              <p className="text-sm mt-2 font-medium">Data from registry (RDAP/DNS) · Buy links to GoDaddy, Namecheap, etc.</p>
+              <p className="text-sm mt-2 font-medium opacity-80">Buy links to GoDaddy, Namecheap, etc.</p>
             </div>
           </div>
         )}
 
         {/* Fetch status: which sources succeeded/failed */}
         {!loading && sourceStatuses.length > 0 && (
-          <div className="mb-6 p-4 bg-white comic-border-thin">
+          <div className="mb-6 p-4 bg-[var(--surface)] text-[var(--foreground)] comic-border-thin">
             <h3 className="font-comic-title text-lg uppercase tracking-wide mb-3">Where we fetched from</h3>
             <ul className="flex flex-wrap gap-2">
               {sourceStatuses.map((s) => (
                 <li
                   key={s.name}
-                  className={`font-bold text-sm uppercase px-3 py-1.5 border-2 border-black ${
-                    s.status === "ok" ? "bg-black text-white" : "bg-white text-black"
+                  className={`font-bold text-sm uppercase px-3 py-1.5 border-2 border-[var(--foreground)] ${
+                    s.status === "ok" ? "bg-[var(--foreground)] text-[var(--surface)]" : "bg-[var(--surface)] text-[var(--foreground)]"
                   }`}
                   title={s.status === "failed" && s.error ? s.error : undefined}
                 >
@@ -199,44 +227,36 @@ export default function Home() {
           const card = (result: DomainResult, index: number) => (
             <div
               key={`${result.domain}-${index}`}
-              className={`p-4 bg-white comic-border-thin transition-transform hover:translate-x-1 hover:translate-y-1 hover:shadow-none ${
-                result.available ? "bg-white" : "bg-black/5"
+              className={`p-4 text-[var(--foreground)] comic-border-thin transition-transform hover:translate-x-1 hover:translate-y-1 hover:shadow-none ${
+                result.available ? "bg-[var(--surface)]" : "bg-[var(--surface-muted)]"
               }`}
             >
               <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 <div className="flex items-center gap-4">
                   <span
-                    className={`font-comic-title inline-flex h-10 w-10 items-center justify-center text-2xl border-2 border-black ${
-                      result.available ? "bg-white text-black" : "bg-black text-white"
+                    className={`font-comic-title inline-flex h-10 w-10 items-center justify-center text-2xl border-2 border-[var(--foreground)] ${
+                      result.available ? "bg-[var(--surface)] text-[var(--foreground)]" : "bg-[var(--foreground)] text-[var(--surface)]"
                     }`}
                   >
                     {result.available ? "!" : "X"}
                   </span>
                   <div>
                     <p className="font-comic-title text-2xl uppercase tracking-wide">{result.domain}</p>
-                    <p className="text-sm font-bold text-black/60 uppercase">
+                    <p className="text-sm font-bold opacity-70 uppercase">
                       TLD: {result.tld}
                       {result.source && ` · ${result.source}`}
                       {result.matchType && (
-                        <span className="ml-2 px-1.5 py-0.5 border border-black/40 text-[10px] uppercase">
+                        <span className="ml-2 px-1.5 py-0.5 border border-[var(--foreground)]/40 text-[10px] uppercase">
                           {result.matchType === "exact" ? "Exact" : "Similar"}
                         </span>
                       )}
                     </p>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-bold uppercase text-black/70">
-                      {result.sourceUrl && (
-                        <span>
-                          Data from:{" "}
-                          <a href={result.sourceUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-black">
-                            {result.source || "Registry"}
-                          </a>
-                        </span>
-                      )}
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-bold uppercase opacity-80">
                       {result.buyLinks && result.buyLinks.length > 0 ? (
                         <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                           Compare prices:{" "}
                           {result.buyLinks.map((link) => (
-                            <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-black">
+                            <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">
                               {link.name}
                             </a>
                           ))}
@@ -244,36 +264,39 @@ export default function Home() {
                       ) : result.registerUrl ? (
                         <span>
                           Compare prices:{" "}
-                          <a href={result.registerUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-black">
+                          <a href={result.registerUrl} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">
                             {result.source ? PLATFORM_LABEL[result.source] ?? result.source : "Registrar"}
                           </a>
                         </span>
                       ) : null}
                     </div>
-                    {!result.available && result.registration && (result.registration.registrar != null || result.registration.created != null || result.registration.expires != null || result.registration.registrant != null) && (
-                      <div className="mt-3 border border-black/20 bg-black/5 px-3 py-2 text-xs">
-                        <p className="font-comic-title uppercase text-black/80 mb-1.5">Registration details</p>
-                        <ul className="space-y-0.5 font-medium text-black/80">
-                          {result.registration.registrar != null && <li><span className="uppercase text-black/60">Registrar:</span> {result.registration.registrar}</li>}
-                          {result.registration.created != null && <li><span className="uppercase text-black/60">Created:</span> {formatDate(result.registration.created)}</li>}
-                          {result.registration.expires != null && <li><span className="uppercase text-black/60">Expires:</span> {formatDate(result.registration.expires)}</li>}
-                          {result.registration.registrant != null && <li><span className="uppercase text-black/60">Registrant:</span> {result.registration.registrant}</li>}
+                    {!result.available && (
+                      <div className="mt-3 border border-[var(--foreground)]/20 bg-[var(--foreground)]/5 px-3 py-2 text-xs">
+                        <p className="font-comic-title uppercase opacity-90 mb-1.5">Who owns it & when</p>
+                        <ul className="space-y-0.5 font-medium opacity-90">
+                          <li><span className="uppercase opacity-70">Who bought:</span> {result.registration?.registrant ?? "—"}</li>
+                          <li><span className="uppercase opacity-70">From (registrar):</span> {result.registration?.registrar ?? "—"}</li>
+                          {result.registration?.contact && (
+                            <li><span className="uppercase opacity-70">Contact:</span> {result.registration.contact}</li>
+                          )}
+                          <li><span className="uppercase opacity-70">Registered:</span> {result.registration?.created ? formatDate(result.registration.created) : "—"}</li>
+                          <li><span className="uppercase opacity-70">Expires:</span> {result.registration?.expires ? formatDate(result.registration.expires) : "—"}</li>
                         </ul>
-                        <p className="mt-1.5 text-black/50 text-[10px] uppercase">Source: RDAP (registry — same data registrars use)</p>
+                        <p className="mt-1.5 opacity-60 text-[10px] uppercase">Source: RDAP (registry). Registrar/owner often redacted for privacy.</p>
                       </div>
                     )}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   {result.type && (
-                    <span className="font-comic-title px-3 py-1 text-xs uppercase border border-black bg-black/5">
+                    <span className="font-comic-title px-3 py-1 text-xs uppercase border border-[var(--foreground)] bg-[var(--foreground)]/10">
                       {result.type === "auction" ? "AUCTION" : "EXPIRED"}
                     </span>
                   )}
                   {result.price && <span className="font-comic-title text-xl">{result.price}</span>}
                   <span
-                    className={`font-comic-title px-4 py-2 text-base uppercase border-2 border-black tracking-wide ${
-                      result.available ? "bg-white text-black" : "bg-black text-white"
+                    className={`font-comic-title px-4 py-2 text-base uppercase border-2 border-[var(--foreground)] tracking-wide ${
+                      result.available ? "bg-[var(--surface)] text-[var(--foreground)]" : "bg-[var(--foreground)] text-[var(--surface)]"
                     }`}
                   >
                     {result.available ? "AVAILABLE!" : "TAKEN"}
@@ -285,17 +308,18 @@ export default function Home() {
           return (
             <div>
               <div className="mb-6 flex flex-wrap items-center gap-4">
-                <h2 className="text-2xl uppercase bg-black text-white px-4 py-2 rotate-[-1deg] tracking-wide">
+                <h2 className="text-2xl uppercase bg-[var(--foreground)] text-[var(--surface)] px-4 py-2 rotate-[-1deg] tracking-wide">
                   {results.length} domains found
                 </h2>
-                <div className="flex gap-3 text-sm font-bold uppercase">
-                  <span className="px-3 py-1 border-2 border-black bg-white">{availableResults.length} Available</span>
-                  <span className="px-3 py-1 border-2 border-black bg-black/10">{takenResults.length} Taken</span>
+                <div className="flex gap-3 text-sm font-bold uppercase text-[var(--foreground)]">
+                  <span className="px-3 py-1 border-2 border-[var(--foreground)] bg-[var(--surface)]">{availableResults.length} Available</span>
+                  <span className="px-3 py-1 border-2 border-[var(--foreground)] bg-[var(--surface-muted)]">{takenResults.length} Taken</span>
                 </div>
               </div>
               {availableResults.length > 0 && (
                 <>
-                  <h3 className="font-comic-title text-xl uppercase tracking-wide mb-3 mt-2">Available — register now</h3>
+                  <h3 className="font-comic-title text-xl uppercase tracking-wide mb-1 mt-2">Available — register now</h3>
+                  <p className="text-xs opacity-70 mb-3">Availability from registry (RDAP/DNS). Confirm at GoDaddy, Namecheap, etc. before purchasing.</p>
                   <div className="grid gap-4 mb-8">
                     {availableResults.map((r, i) => card(r, i))}
                   </div>
@@ -315,7 +339,7 @@ export default function Home() {
 
         {/* No Results */}
         {!loading && searchedKeyword && results.length === 0 && !error && (
-          <div className="text-center p-6 comic-border bg-white">
+          <div className="text-center p-6 comic-border bg-[var(--surface)] text-[var(--foreground)]">
             <h3 className="uppercase text-2xl tracking-wide">
               No domains found for &quot;{searchedKeyword}&quot;
             </h3>
@@ -325,12 +349,9 @@ export default function Home() {
       </div>
 
       {/* Footer: anchored at bottom */}
-      <footer className="border-t border-black/20 py-6 text-center space-y-1">
+      <footer className="border-t border-[var(--foreground)]/20 py-6 text-center">
         <p className="font-comic-title text-lg uppercase tracking-wide">
           Product of Donalabs
-        </p>
-        <p className="text-xs text-black/50">
-          <a href="https://www.icann.org/en/contracted-parties/accredited-registrars/how-to-become-a-registrar" target="_blank" rel="noopener noreferrer" className="underline hover:text-black/70">How to become a registrar?</a>
         </p>
       </footer>
     </div>
