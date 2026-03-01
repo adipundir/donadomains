@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Donadomains
 
-## Getting Started
+Search domain availability and compare registrar prices in one place.
 
-First, run the development server:
+Check if a domain is available using registry data (RDAP/DNS), see exact and similar name suggestions, and get direct links to compare prices at GoDaddy, Namecheap, Squarespace, Cloudflare, and Porkbun.
+
+**Product of [Donalabs](https://donalabs.com).**
+
+## Features
+
+- **Domain search** — Enter a keyword or full domain (e.g. `myname.com`); we parse it and check availability across 20+ TLDs.
+- **Exact + similar names** — Results include exact matches (keyword + TLD) and similar variants (e.g. keyword+online, my+keyword) for .com, .net, .org.
+- **Registry-only data** — Availability and registration details (registrar, created, expires, registrant) come from RDAP/DNS; no scraping.
+- **Compare prices** — Each result links to multiple registrars so you can compare where to buy the same domain.
+- **Taken domain details** — For taken domains, see who registered it, when it expires, and current registrar (when not redacted).
+
+## Tech stack
+
+- **Next.js** (App Router), **React**, **TypeScript**, **Tailwind CSS**
+- **RDAP** + **DNS** for availability and registration data
+- **Server Actions** for all search logic (no public API)
+
+## Getting started
 
 ```bash
+# Install dependencies
+npm install
+
+# Run development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). Enter a keyword or domain and search.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment (optional)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+No env vars required. Optional:
 
-## Learn More
+- `GODADDY_KEY` / `GODADDY_SECRET` — Not used in current registry-only flow; reserved for future optional GoDaddy API pricing.
 
-To learn more about Next.js, take a look at the following resources:
+## Build
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run build
+npm start
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## License
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Private / All rights reserved.

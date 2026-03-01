@@ -1,26 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&display=swap');
 @import "tailwindcss";
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --foreground: #000000;
+  --font-title: 'Bangers', cursive;
+  --font-body: 'Comic Neue', cursive;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+
+/* Headings use Bangers */
+h1, h2, h3 {
+  font-family: var(--font-title);
+  letter-spacing: 0.05em;
+}
+
+/* Utility classes for fonts */
+.font-comic-title {
+  font-family: var(--font-title);
+}
+
+.font-comic-body {
+  font-family: var(--font-body);
+}
+
+/* Comic style borders */
+.comic-border {
+  border: 3px solid #000;
+  box-shadow: 4px 4px 0px #000;
+}
+
+.comic-border-thin {
+  border: 2px solid #000;
+  box-shadow: 3px 3px 0px #000;
+}
+
+/* Comic button hover effect */
+.comic-btn:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0px #000;
+}
+
+.comic-btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0px 0px 0px #000;
+}
+
+/* Halftone pattern for backgrounds */
+.halftone {
+  background-image: radial-gradient(circle, #000 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+/* Speech bubble tail */
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -15px;
+  left: 30px;
+  border-width: 15px 10px 0;
+  border-style: solid;
+  border-color: #000 transparent transparent transparent;
+}
+
+.speech-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 33px;
+  border-width: 12px 7px 0;
+  border-style: solid;
+  border-color: #fff transparent transparent transparent;
+  z-index: 1;
 }
