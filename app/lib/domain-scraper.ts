@@ -18,6 +18,8 @@ export interface DomainRegistrationDetails {
 export interface BuyLink {
   name: string;
   url: string;
+  /** Price when available from API (e.g. "$12.99/yr") */
+  price?: string;
 }
 
 export interface DomainResult {
@@ -67,6 +69,44 @@ function parseKeyword(keyword: string): { baseName: string; userTld?: string } {
 const SIMILAR_SUFFIXES = ["online", "hub", "app", "io", "hq"];
 const SIMILAR_PREFIXES = ["my", "get", "the", "go"];
 const SIMILAR_TLDS = [".com", ".net", ".org"];
+
+const GODADDY_API_TIMEOUT_MS = 5000;
+
+/** Fetch GoDaddy price for a domain when API credentials are set. Returns e.g. "$12.99/yr" or null. */
+async function fetchGoDaddyPrice(domain: string): Promise<string | null> {
+  const key = process.env.GODADDY_KEY;
+  const secret = process.env.GODADDY_SECRET;
+  if (!key || !secret) return null;
+  try {
+    const res = await fetch(
+      `https://api.godaddy.com/v1/domains/available?domain=${encodeURIComponent(domain)}`,
+      {
+        headers: { Authorization: `sso-key ${key}:${secret}` },
+        signal: AbortSignal.timeout(GODADDY_API_TIMEOUT_MS),
+      }
+    );
+    if (!res.ok) {
+      if (res.status === 429) console.log(`[GoDaddy] rate limited for ${domain}`);
+      return null;
+    }
+    const data = (await res.json()) as Record<string, unknown>;
+    const price = data.price as number | undefined;
+    const currency = (data.currency ?? "USD") as string;
+    if (typeof price === "number" && price >= 0) {
+      const symbol = currency === "USD" ? "$" : currency + " ";
+      return `${symbol}${(price / 100).toFixed(2)}/yr`;
+    }
+    const priceInfo = data.priceInfo as { price?: number; currency?: string } | undefined;
+    if (priceInfo && typeof priceInfo.price === "number") {
+      const sym = priceInfo.currency === "USD" ? "$" : (priceInfo.currency ?? "") + " ";
+      return `${sym}${(priceInfo.price / 100).toFixed(2)}/yr`;
+    }
+    return null;
+  } catch (err) {
+    console.log(`[GoDaddy] price fetch error for ${domain}:`, err);
+    return null;
+  }
+}
 
 function getBuyLinksForDomain(domain: string): BuyLink[] {
   const enc = encodeURIComponent(domain);
@@ -192,12 +232,16 @@ async function fetchRdapDetails(domain: string): Promise<DomainRegistrationDetai
     } else {
       console.log(`[RDAP details] ${domain} → entities:`, raw.entities);
     }
-    const data =
-      raw && typeof raw === "object" && Array.isArray((raw as { events?: unknown }).events)
-        ? (raw as { events?: Array<{ eventAction?: string; eventDate?: string }>; entities?: Array<{ role?: string[]; vcardArray?: unknown[] }>; status?: string[] })
-        : raw && typeof raw === "object" && raw.domain && typeof (raw.domain as object) === "object"
-          ? (raw.domain as { events?: Array<{ eventAction?: string; eventDate?: string }>; entities?: Array<{ role?: string[]; vcardArray?: unknown[] }>; status?: string[] })
-          : null;
+    type RdapData = { events?: Array<{ eventAction?: string; eventDate?: string }>; entities?: Array<{ role?: string | string[]; roles?: string | string[]; vcardArray?: unknown[]; handle?: string }>; status?: string[] };
+    const rawCast = raw as { events?: unknown; domain?: RdapData; entities?: unknown; ldhName?: string };
+    const data: RdapData | null =
+      raw && typeof raw === "object" && Array.isArray(rawCast.events)
+        ? (raw as RdapData)
+        : raw && typeof raw === "object" && rawCast.domain && typeof rawCast.domain === "object"
+          ? rawCast.domain
+          : raw && typeof raw === "object" && (rawCast.ldhName || rawCast.entities) && (Array.isArray(rawCast.events) || Array.isArray(rawCast.entities))
+            ? (raw as RdapData)
+            : null;
     if (!data) {
       console.log(`[RDAP details] ${domain} → no data (events not at top level or domain)`);
       return null;
@@ -205,16 +249,16 @@ async function fetchRdapDetails(domain: string): Promise<DomainRegistrationDetai
     const out: DomainRegistrationDetails = {};
     const events = Array.isArray(data.events) ? data.events : [];
     for (const e of events) {
-      const action = (e.eventAction ?? "").toLowerCase();
-      const date = e.eventDate;
+      const action = String((e as { eventAction?: string }).eventAction ?? "").toLowerCase();
+      const date = (e as { eventDate?: string }).eventDate;
       if (!date || typeof date !== "string") continue;
       if (action === "registration") out.created = date;
-      else if (action === "expiration" || action === "expiry") out.expires = date;
+      else if (action === "expiration" || action === "expiry" || action === "expires") out.expires = date;
     }
     if (Array.isArray(data.status)) out.status = data.status;
     const entities = Array.isArray(data.entities) ? data.entities : [];
     for (const ent of entities) {
-      const roleRaw = ent.role;
+      const roleRaw = ent.roles ?? ent.role;
       const roles: string[] = Array.isArray(roleRaw)
         ? roleRaw.map((r) => String(r).toLowerCase())
         : roleRaw != null
@@ -222,9 +266,9 @@ async function fetchRdapDetails(domain: string): Promise<DomainRegistrationDetai
           : [];
       const vcard = parseVcard(ent.vcardArray);
       const name = vcard.name || vcard.org || null;
-      if (!name && !vcard.email) continue;
+      const display = name || vcard.email || null;
       if (roles.includes("registrar")) {
-        out.registrar = name || vcard.email || undefined;
+        out.registrar = display || ent.handle || undefined;
       } else if (
         roles.includes("registrant") ||
         roles.some((r) => r.includes("registrant"))
@@ -382,6 +426,16 @@ export async function searchDomainsMultiSource(keyword: string): Promise<SearchD
       console.log(`[DomainFinder] Taken domain #${i + 1} full object:\n${JSON.stringify(r, null, 2)}`);
     });
   }
+
+  // Enrich buy links with GoDaddy price (when API credentials are set). Limit to first 25 to avoid rate limits.
+  const toEnrich = list.slice(0, 25);
+  const godaddyPrices = await Promise.all(toEnrich.map((r) => fetchGoDaddyPrice(r.domain)));
+  godaddyPrices.forEach((price, i) => {
+    if (price && toEnrich[i].buyLinks) {
+      const godaddy = toEnrich[i].buyLinks!.find((l) => l.name === "GoDaddy");
+      if (godaddy) godaddy.price = price;
+    }
+  });
 
   const elapsed = Date.now() - startTime;
   const availableCount = list.filter((r) => r.available).length;
