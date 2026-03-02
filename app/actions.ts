@@ -13,12 +13,12 @@ export interface SearchDomainsResult {
 export async function searchDomainsAction(
   keyword: string
 ): Promise<SearchDomainsResult> {
-  const requestId = Math.random().toString(36).substring(7);
-  console.log(`[Action ${requestId}] searchDomainsAction called with keyword: "${keyword}"`);
+  const requestId = Math.random().toString(36).slice(2, 8);
+  console.log(`\n[${requestId}] ========== SEARCH START ==========`);
+  console.log(`[${requestId}] Keyword: "${keyword}"`);
 
   // Basic validation
   if (!keyword || keyword.trim().length === 0) {
-    console.log(`[Action ${requestId}] Validation failed: empty keyword`);
     return {
       success: false,
       keyword,
@@ -30,7 +30,6 @@ export async function searchDomainsAction(
   const trimmedKeyword = keyword.trim();
 
   if (trimmedKeyword.length < 1 || trimmedKeyword.length > 63) {
-    console.log(`[Action ${requestId}] Validation failed: keyword length ${trimmedKeyword.length} out of range`);
     return {
       success: false,
       keyword: trimmedKeyword,
@@ -42,7 +41,6 @@ export async function searchDomainsAction(
   // Check for invalid characters (only allow alphanumeric, hyphens, and dots)
   const validPattern = /^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/;
   if (!validPattern.test(trimmedKeyword)) {
-    console.log(`[Action ${requestId}] Validation failed: invalid characters in "${trimmedKeyword}"`);
     return {
       success: false,
       keyword: trimmedKeyword,
@@ -52,14 +50,15 @@ export async function searchDomainsAction(
     };
   }
 
-  console.log(`[Action ${requestId}] Validation passed. Running SERVER-SIDE fetch only (no client-side fetching).`);
   const startTime = Date.now();
-
   try {
     const { results, sourceStatuses } = await searchDomainsMultiSource(trimmedKeyword);
     const elapsed = Date.now() - startTime;
-    const failed = sourceStatuses.filter((s) => s.status === "failed").length;
-    console.log(`[Action ${requestId}] SERVER-SIDE fetch completed in ${elapsed}ms. Results: ${results.length}. Sources: ${sourceStatuses.filter((s) => s.status === "ok").length} ok, ${failed} failed.`);
+    const withPrices = results.filter((r) => r.buyLinks?.some((l) => l.price != null)).length;
+    const availableCount = results.filter((r) => r.available).length;
+    const takenCount = results.length - availableCount;
+    console.log(`[${requestId}] ========== DONE ==========`);
+    console.log(`[${requestId}] Time: ${elapsed}ms | Results: ${results.length} (${availableCount} avail, ${takenCount} taken) | With prices: ${withPrices}`);
     return {
       success: true,
       keyword: trimmedKeyword,
@@ -67,8 +66,7 @@ export async function searchDomainsAction(
       sourceStatuses,
     };
   } catch (error) {
-    const elapsed = Date.now() - startTime;
-    console.error(`[Action ${requestId}] Search failed after ${elapsed}ms:`, error);
+    console.error(`[${requestId}] Search failed:`, error);
     return {
       success: false,
       keyword: trimmedKeyword,

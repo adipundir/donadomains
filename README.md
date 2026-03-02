@@ -30,7 +30,14 @@ Open [http://localhost:3000](http://localhost:3000), enter a keyword or domain, 
 
 No env vars required. Optional:
 
-- `GODADDY_KEY` / `GODADDY_SECRET` — Reserved for future optional GoDaddy API pricing; not used in the current registry-only flow.
+- `GODADDY_KEY` / `GODADDY_SECRET` — GoDaddy API for per-domain pricing (production requires 50+ domains).
+- `NAMECHEAP_API_USER` / `NAMECHEAP_API_KEY` / `NAMECHEAP_API_IP` — Namecheap API for TLD pricing (whitelist IP in Namecheap account).
+- `BROWSERLESS_TOKEN` — Enables Browserless for all scrapers (GoDaddy, Namecheap, Squarespace, Cloudflare). GoDaddy uses Akamai; Browserless bypasses it. Get a token at [browserless.io](https://www.browserless.io/) (free tier: 1000 runs/mo).
+- `BROWSERLESS_PROXY` — Set to `residential` to use residential proxy (required for GoDaddy).
+- `BROWSERLESS_URL` — Override WSS URL; otherwise derived from token.
+- `SAVE_SCRAPER_HTML=1` — Debug: save HTML when scraping fails (writes to `/tmp`).
+
+Pricing sources (all server-side): Porkbun (public API), GoDaddy (API or scrape), Namecheap (API or scrape).
 
 ## Build
 

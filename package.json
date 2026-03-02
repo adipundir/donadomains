@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:scrapers": "npx tsx scripts/test-scrapers.ts",
+    "test:rdap": "npx tsx scripts/test-rdap-contact.ts",
+    "test:search": "npx tsx scripts/test-search.ts"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",
@@ -20,6 +23,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.2.4",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
