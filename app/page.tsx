@@ -36,6 +36,7 @@ interface BuyLink {
   name: string;
   url: string;
   price?: string;
+  isCheapest?: boolean;
 }
 
 interface DomainResult {
@@ -327,7 +328,7 @@ export default function Home() {
                           Compare prices:{" "}
                           {result.buyLinks.map((link) => (
                             <a key={link.name} href={link.url} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">
-                              {link.name}{link.price ? ` ${link.price}` : ""}
+                              {link.name}{link.price ? ` ${link.price}` : ""}{link.isCheapest ? " (cheapest)" : ""}
                             </a>
                           ))}
                         </span>

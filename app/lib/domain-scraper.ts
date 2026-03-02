@@ -20,6 +20,10 @@ export interface BuyLink {
   url: string;
   /** Price when available from API (e.g. "$12.99/yr") */
   price?: string;
+  /** Numeric price for comparison (dollars) */
+  priceNum?: number;
+  /** True when this is the lowest price among registrars with known prices */
+  isCheapest?: boolean;
 }
 
 export interface DomainResult {
@@ -71,9 +75,42 @@ const SIMILAR_PREFIXES = ["my", "get", "the", "go"];
 const SIMILAR_TLDS = [".com", ".net", ".org"];
 
 const GODADDY_API_TIMEOUT_MS = 5000;
+const PORKBUN_API_TIMEOUT_MS = 5000;
 
-/** Fetch GoDaddy price for a domain when API credentials are set. Returns e.g. "$12.99/yr" or null. */
-async function fetchGoDaddyPrice(domain: string): Promise<string | null> {
+let porkbunPricingCache: Record<string, number> | null = null;
+
+/** Fetch Porkbun TLD pricing (registration). Cached for session. Returns price in dollars or null. */
+async function fetchPorkbunTldPrice(tldKey: string): Promise<number | null> {
+  if (!porkbunPricingCache) {
+    try {
+      const res = await fetch("https://api.porkbun.com/api/json/v3/pricing/get", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+        signal: AbortSignal.timeout(PORKBUN_API_TIMEOUT_MS),
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as { status?: string; pricing?: Record<string, { registration?: string }> };
+      if (data.status !== "SUCCESS" || !data.pricing) return null;
+      porkbunPricingCache = {};
+      for (const [tld, info] of Object.entries(data.pricing)) {
+        const reg = info?.registration;
+        if (typeof reg === "string") {
+          const num = parseFloat(reg);
+          if (!isNaN(num)) porkbunPricingCache[tld.toLowerCase()] = num;
+        }
+      }
+    } catch (err) {
+      console.log("[Porkbun] pricing fetch error:", err);
+      return null;
+    }
+  }
+  const price = porkbunPricingCache?.[tldKey.toLowerCase()];
+  return typeof price === "number" ? price : null;
+}
+
+/** Fetch GoDaddy price for a domain when API credentials are set. Returns { price: string, priceNum: number } or null. */
+async function fetchGoDaddyPrice(domain: string): Promise<{ price: string; priceNum: number } | null> {
   const key = process.env.GODADDY_KEY;
   const secret = process.env.GODADDY_SECRET;
   if (!key || !secret) return null;
@@ -93,13 +130,15 @@ async function fetchGoDaddyPrice(domain: string): Promise<string | null> {
     const price = data.price as number | undefined;
     const currency = (data.currency ?? "USD") as string;
     if (typeof price === "number" && price >= 0) {
+      const num = price / 100;
       const symbol = currency === "USD" ? "$" : currency + " ";
-      return `${symbol}${(price / 100).toFixed(2)}/yr`;
+      return { price: `${symbol}${num.toFixed(2)}/yr`, priceNum: num };
     }
     const priceInfo = data.priceInfo as { price?: number; currency?: string } | undefined;
     if (priceInfo && typeof priceInfo.price === "number") {
+      const num = priceInfo.price / 100;
       const sym = priceInfo.currency === "USD" ? "$" : (priceInfo.currency ?? "") + " ";
-      return `${sym}${(priceInfo.price / 100).toFixed(2)}/yr`;
+      return { price: `${sym}${num.toFixed(2)}/yr`, priceNum: num };
     }
     return null;
   } catch (err) {
@@ -437,15 +476,40 @@ export async function searchDomainsMultiSource(keyword: string): Promise<SearchD
     });
   }
 
-  // Enrich buy links with GoDaddy price (when API credentials are set). Limit to first 25 to avoid rate limits.
-  const toEnrich = list.slice(0, 25);
-  const godaddyPrices = await Promise.all(toEnrich.map((r) => fetchGoDaddyPrice(r.domain)));
-  godaddyPrices.forEach((price, i) => {
-    if (price && toEnrich[i].buyLinks) {
-      const godaddy = toEnrich[i].buyLinks!.find((l) => l.name === "GoDaddy");
-      if (godaddy) godaddy.price = price;
+  // Enrich buy links with prices: GoDaddy (per-domain, when API set), Porkbun (TLD-based)
+  const toEnrich = list.slice(0, 30);
+  const [godaddyPrices] = await Promise.all([
+    Promise.all(toEnrich.map((r) => fetchGoDaddyPrice(r.domain))),
+    fetchPorkbunTldPrice("com"), // Preload Porkbun cache
+  ]);
+  godaddyPrices.forEach((p, i) => {
+    if (p && toEnrich[i].buyLinks) {
+      const g = toEnrich[i].buyLinks!.find((l) => l.name === "GoDaddy");
+      if (g) {
+        g.price = p.price;
+        g.priceNum = p.priceNum;
+      }
     }
   });
+  for (const r of toEnrich) {
+    if (!r.buyLinks) continue;
+    const tldKey = tldToKey(r.tld);
+    const porkbunPrice = await fetchPorkbunTldPrice(tldKey);
+    if (porkbunPrice != null) {
+      const pb = r.buyLinks.find((l) => l.name === "Porkbun");
+      if (pb) {
+        pb.price = `$${porkbunPrice.toFixed(2)}/yr`;
+        pb.priceNum = porkbunPrice;
+      }
+    }
+    const withPrice = r.buyLinks.filter((l) => l.priceNum != null);
+    if (withPrice.length > 0) {
+      const minPrice = Math.min(...withPrice.map((l) => l.priceNum!));
+      withPrice.forEach((l) => {
+        if (l.priceNum === minPrice) l.isCheapest = true;
+      });
+    }
+  }
 
   const elapsed = Date.now() - startTime;
   const availableCount = list.filter((r) => r.available).length;
