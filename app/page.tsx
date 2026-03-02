@@ -113,90 +113,165 @@ export default function Home() {
       {/* Dotted pattern background */}
       <div className="fixed inset-0 opacity-5 pointer-events-none halftone" />
 
-      {/* Navbar: contained content, logo left / theme right */}
-      <nav className="relative border-b border-current/10 py-4 px-6 sm:px-8 w-full">
+      {/* Navbar: no section line, same background */}
+      <nav className="relative py-4 px-6 sm:px-8 w-full bg-[var(--background)]">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-8">
           <span className="font-comic-title text-2xl sm:text-3xl uppercase tracking-wide">Donadomains</span>
           <ThemeSwitcher />
         </div>
       </nav>
 
-      {/* Search hero: centered until user has searched, then full width */}
-      <section className="w-full border-b border-[var(--foreground)]/10 bg-[var(--surface)]/50 py-8 sm:py-12">
-        <div className={`mx-auto px-4 sm:px-6 lg:px-8 ${centerHero ? "max-w-3xl" : "max-w-7xl"}`}>
-          <p className="text-center text-[var(--foreground)] font-comic-title text-xl sm:text-2xl uppercase tracking-wide mb-4">
-            Find your domain
-          </p>
-          <form onSubmit={handleSearch} className={centerHero ? "w-full" : "max-w-3xl mx-auto"}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
-                  placeholder="e.g. myname or myname.com"
-                  className="font-comic-body w-full px-5 py-4 text-lg font-bold bg-[var(--background)] text-[var(--foreground)] placeholder-[var(--foreground)]/25 uppercase comic-border focus:outline-none focus:ring-0"
-                  disabled={loading}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="font-comic-title px-8 py-4 text-xl bg-black text-white uppercase comic-border comic-btn transition-all disabled:opacity-50 disabled:cursor-not-allowed tracking-wide shrink-0"
-              >
-                {loading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="inline-block animate-bounce">.</span>
-                    <span className="inline-block animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
-                    <span className="inline-block animate-bounce" style={{ animationDelay: "0.2s" }}>.</span>
-                  </span>
-                ) : (
-                  "SEARCH!"
-                )}
-              </button>
+      {/* Pre-search: one block vertically centered; after search: normal stacked layout */}
+      {centerHero ? (
+        <div className="flex-1 flex flex-col justify-center w-full bg-[var(--background)]">
+          <section className="w-full py-8 sm:py-12 bg-[var(--background)]">
+            <div className="mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
+              <p className="text-center text-[var(--foreground)] font-comic-title text-xl sm:text-2xl uppercase tracking-wide mb-4">
+                Find your domain
+              </p>
+              <form onSubmit={handleSearch} className="w-full">
+                <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)}
+                      placeholder="e.g. myname or myname.com"
+                      className="font-comic-body w-full px-5 py-4 text-lg font-bold bg-[var(--background)] text-[var(--foreground)] placeholder-[var(--foreground)]/25 uppercase comic-border focus:outline-none focus:ring-0"
+                      disabled={loading}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="font-comic-title px-8 py-4 text-xl bg-black text-white uppercase comic-border comic-btn transition-all disabled:opacity-50 disabled:cursor-not-allowed tracking-wide shrink-0"
+                  >
+                    {loading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="inline-block animate-bounce">.</span>
+                        <span className="inline-block animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
+                        <span className="inline-block animate-bounce" style={{ animationDelay: "0.2s" }}>.</span>
+                      </span>
+                    ) : (
+                      "SEARCH!"
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
-          </form>
+          </section>
+          <section className="w-full py-6 bg-[var(--background)]">
+            <div className="mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
+              <p className="text-center text-[var(--foreground)] font-comic-title text-lg uppercase tracking-wide mb-3 opacity-90 flex items-center justify-center gap-2">
+                <span className="inline-block text-xl" aria-hidden>↗</span>
+                Hot domains right now
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {[
+                  "myname.com",
+                  "startup.io",
+                  "getapp.dev",
+                  "coolname.co",
+                  "techstudio.io",
+                  "buildship.com",
+                  "shipit.app",
+                  "cool.tech",
+                ].map((domain) => (
+                  <button
+                    key={domain}
+                    type="button"
+                    onClick={() => {
+                      setKeyword(domain);
+                      setError(null);
+                      setResults([]);
+                      setSearchedKeyword(null);
+                    }}
+                    className="font-comic-body px-4 py-2 text-sm font-bold uppercase comic-border-thin bg-[var(--background)] text-[var(--foreground)] border-2 border-[var(--foreground)] hover:opacity-90 transition-opacity"
+                  >
+                    {domain}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
         </div>
-      </section>
+      ) : (
+        <>
+          <section className="w-full py-8 sm:py-12 bg-[var(--background)]">
+            <div className="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+              <p className="text-center text-[var(--foreground)] font-comic-title text-xl sm:text-2xl uppercase tracking-wide mb-4">
+                Find your domain
+              </p>
+              <form onSubmit={handleSearch} className="max-w-3xl mx-auto">
+                <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)}
+                      placeholder="e.g. myname or myname.com"
+                      className="font-comic-body w-full px-5 py-4 text-lg font-bold bg-[var(--background)] text-[var(--foreground)] placeholder-[var(--foreground)]/25 uppercase comic-border focus:outline-none focus:ring-0"
+                      disabled={loading}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="font-comic-title px-8 py-4 text-xl bg-black text-white uppercase comic-border comic-btn transition-all disabled:opacity-50 disabled:cursor-not-allowed tracking-wide shrink-0"
+                  >
+                    {loading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="inline-block animate-bounce">.</span>
+                        <span className="inline-block animate-bounce" style={{ animationDelay: "0.1s" }}>.</span>
+                        <span className="inline-block animate-bounce" style={{ animationDelay: "0.2s" }}>.</span>
+                      </span>
+                    ) : (
+                      "SEARCH!"
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+          <section className="w-full py-6 bg-[var(--background)]">
+            <div className="mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+              <p className="text-center text-[var(--foreground)] font-comic-title text-lg uppercase tracking-wide mb-3 opacity-90 flex items-center justify-center gap-2">
+                <span className="inline-block text-xl" aria-hidden>↗</span>
+                Hot domains right now
+              </p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {[
+                  "myname.com",
+                  "startup.io",
+                  "getapp.dev",
+                  "coolname.co",
+                  "techstudio.io",
+                  "buildship.com",
+                  "shipit.app",
+                  "cool.tech",
+                ].map((domain) => (
+                  <button
+                    key={domain}
+                    type="button"
+                    onClick={() => {
+                      setKeyword(domain);
+                      setError(null);
+                      setResults([]);
+                      setSearchedKeyword(null);
+                    }}
+                    className="font-comic-body px-4 py-2 text-sm font-bold uppercase comic-border-thin bg-[var(--background)] text-[var(--foreground)] border-2 border-[var(--foreground)] hover:opacity-90 transition-opacity"
+                  >
+                    {domain}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+        </>
+      )}
 
-      {/* Hot domain names: centered until user has searched, then full width */}
-      <section className="w-full border-b border-[var(--foreground)]/10 bg-[var(--background)] py-6">
-        <div className={`mx-auto px-4 sm:px-6 lg:px-8 ${centerHero ? "max-w-3xl" : "max-w-7xl"}`}>
-          <p className="text-center text-[var(--foreground)] font-comic-title text-lg uppercase tracking-wide mb-3 opacity-90 flex items-center justify-center gap-2">
-            <span className="inline-block text-xl" aria-hidden>↗</span>
-            Hot domains right now
-          </p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {[
-              "myname.com",
-              "startup.io",
-              "getapp.dev",
-              "coolname.co",
-              "techstudio.io",
-              "buildship.com",
-              "shipit.app",
-              "cool.tech",
-            ].map((domain) => (
-              <button
-                key={domain}
-                type="button"
-                onClick={() => {
-                  setKeyword(domain);
-                  setError(null);
-                  setResults([]);
-                  setSearchedKeyword(null);
-                }}
-                className="font-comic-body px-4 py-2 text-sm font-bold uppercase comic-border-thin bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-muted)] transition-colors"
-              >
-                {domain}
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Main content: two-column layout when results, use full width */}
-      <div className={`relative flex-1 flex flex-col mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 max-w-7xl ${results.length > 0 ? "justify-start" : "max-w-3xl justify-center"}`}>
+      {/* Main content: two-column when results; when pre-search no flex-1 so hero stays vertically centered */}
+      <div className={`relative flex flex-col mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 max-w-7xl ${centerHero ? "" : "flex-1"} ${results.length > 0 ? "justify-start" : "max-w-3xl justify-center"}`}>
 
         {/* Error Message */}
         {error && (
@@ -381,7 +456,7 @@ export default function Home() {
       </div>
 
       {/* Footer: anchored at bottom */}
-      <footer className="border-t border-[var(--foreground)]/20 py-6 text-center">
+      <footer className="py-6 text-center bg-[var(--background)]">
         <p className="font-comic-title text-lg uppercase tracking-wide">
           Product of Donalabs
         </p>
