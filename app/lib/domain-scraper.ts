@@ -191,14 +191,17 @@ async function rdapFetch(domain: string, timeoutMs: number): Promise<Response> {
   return fetch(rdapOrgUrl, { signal: AbortSignal.timeout(Math.min(timeoutMs, RDAP_FALLBACK_TIMEOUT_MS)) });
 }
 
-async function checkDnsAvailability(domain: string): Promise<boolean> {
+/** Returns: true = no DNS records (likely available), false = has records (taken), null = DNS inconclusive (e.g. timeout) */
+async function checkDnsAvailability(domain: string): Promise<boolean | null> {
   try {
     await dnsResolve(domain);
-    return false;
+    return false; // Has DNS records = taken
   } catch (error: unknown) {
     const err = error as { code?: string };
-    if (err.code === "ENOTFOUND" || err.code === "ENODATA") return true;
-    return false;
+    if (err.code === "ENOTFOUND" || err.code === "ENODATA") return true; // No records = available
+    // SERVFAIL, ETIMEOUT, ECONNREFUSED, etc. = don't assume taken; RDAP will decide
+    console.log(`[DNS] ${domain} → inconclusive (${err.code ?? "unknown"}), falling back to RDAP`);
+    return null;
   }
 }
 
@@ -332,11 +335,18 @@ async function checkOneDomain(
   sourceUrl: string,
   matchType: "exact" | "similar"
 ): Promise<DomainResult> {
-  const dnsAvailable = await checkDnsAvailability(domain);
+  const dnsResult = await checkDnsAvailability(domain);
   let available = false;
-  if (dnsAvailable) {
+  if (dnsResult === false) {
+    available = false; // DNS has records = taken
+  } else {
     const rdap = await checkRdapAvailability(domain);
-    available = rdap.checked ? rdap.available : dnsAvailable;
+    if (rdap.checked) {
+      available = rdap.available;
+    } else {
+      // RDAP failed; use DNS result if we have it (true = available), else assume taken
+      available = dnsResult === true;
+    }
   }
   const buyLinks = getBuyLinksForDomain(domain);
   return {

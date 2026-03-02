@@ -281,19 +281,12 @@ export default function Home() {
           </div>
         )}
 
-        {/* Loading State */}
+        {/* Loading: 3 dots below main area when searching (button already shows loading state) */}
         {loading && (
-          <div className="mb-6 text-center">
-            <div className="inline-block p-6 bg-[var(--surface)] text-[var(--foreground)] comic-border relative speech-bubble">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl animate-bounce">*</span>
-                <span className="font-comic-title text-xl uppercase tracking-wide">
-                  Checking availability...
-                </span>
-                <span className="text-2xl animate-bounce" style={{ animationDelay: "0.2s" }}>*</span>
-              </div>
-              <p className="text-sm mt-2 font-medium opacity-80">Buy links to GoDaddy, Namecheap, etc.</p>
-            </div>
+          <div className="flex justify-center gap-1 py-4">
+            <span className="w-2 h-2 rounded-full bg-[var(--foreground)] animate-bounce" />
+            <span className="w-2 h-2 rounded-full bg-[var(--foreground)] animate-bounce" style={{ animationDelay: "0.15s" }} />
+            <span className="w-2 h-2 rounded-full bg-[var(--foreground)] animate-bounce" style={{ animationDelay: "0.3s" }} />
           </div>
         )}
 
