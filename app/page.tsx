@@ -19,9 +19,9 @@ function ThemeSwitcher() {
       {!mounted ? (
         <span className="w-5 h-5 block" />
       ) : isDark ? (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" /></svg>
       ) : (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /></svg>
       )}
     </button>
   );
@@ -213,9 +213,8 @@ function LoadingStages({ startTime }: { startTime: number }) {
                 return (
                   <div
                     key={task.label}
-                    className={`flex items-center gap-3 py-2 px-3 transition-all duration-300 ${
-                      future ? "opacity-20" : done ? "opacity-50" : "opacity-100"
-                    }`}
+                    className={`flex items-center gap-3 py-2 px-3 transition-all duration-300 ${future ? "opacity-20" : done ? "opacity-50" : "opacity-100"
+                      }`}
                   >
                     <div className="shrink-0 w-5 h-5 flex items-center justify-center">
                       {done ? (
@@ -338,11 +337,10 @@ export default function Home() {
   const card = (result: DomainResult, index: number) => (
     <div
       key={`${result.domain}-${index}`}
-      className={`p-3 sm:p-4 md:p-5 border-2 transition-all animate-fadeInUp flex flex-col ${
-        result.available
+      className={`p-3 sm:p-4 md:p-5 border-2 transition-all animate-fadeInUp flex flex-col ${result.available
           ? "border-[var(--border)] bg-[var(--surface)] shadow-[3px_3px_0px_var(--border)] hover:shadow-[1px_1px_0px_var(--border)] hover:translate-x-[2px] hover:translate-y-[2px]"
           : "border-[var(--border-light)] bg-[var(--surface-muted)]"
-      }`}
+        }`}
       style={{ animationDelay: `${Math.min(index * 40, 300)}ms` }}
     >
       <div className="flex items-start justify-between gap-3">
@@ -389,11 +387,10 @@ export default function Home() {
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-bold transition-all ${
-                  link.isCheapest
+                className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-bold transition-all ${link.isCheapest
                     ? "bg-[var(--foreground)] text-[var(--background)] border-2 border-[var(--foreground)] shadow-[2px_2px_0px_var(--accent)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px]"
                     : "border border-[var(--border-light)] hover:border-[var(--border)] bg-[var(--surface)]"
-                }`}
+                  }`}
               >
                 <span className="font-comic-title uppercase tracking-wide">{link.name}</span>
                 {link.price && <span className={link.isCheapest ? "font-comic-title" : "opacity-70"}>{link.price}</span>}
@@ -445,9 +442,8 @@ export default function Home() {
     return (
       <div
         key={`${result.domain}-${index}`}
-        className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 py-3 border-b border-[var(--border-light)] transition-all animate-fadeInUp ${
-          result.available ? "hover:bg-[var(--surface)]" : "opacity-70"
-        }`}
+        className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 py-3 border-b border-[var(--border-light)] transition-all animate-fadeInUp ${result.available ? "hover:bg-[var(--surface)]" : "opacity-70"
+          }`}
         style={{ animationDelay: `${Math.min(index * 25, 200)}ms` }}
       >
         {/* Domain + badge */}
@@ -498,11 +494,10 @@ export default function Home() {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold transition-all ${
-                    link.isCheapest
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold transition-all ${link.isCheapest
                       ? "bg-[var(--foreground)] text-[var(--background)] border border-[var(--foreground)]"
                       : "border border-[var(--border-light)] hover:border-[var(--border)]"
-                  }`}
+                    }`}
                 >
                   <span className="font-comic-title uppercase tracking-wide">{link.name}</span>
                   {link.price && <span className="opacity-70">{link.price}</span>}
@@ -527,19 +522,27 @@ export default function Home() {
   };
 
   /* ── Render helper: grid of cards or list of rows ── */
+  /* On mobile (< md) always show cards; list view only on md+ */
   const renderResults = (items: DomainResult[]) =>
     viewMode === "card" ? (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {items.map((r, i) => card(r, i))}
       </div>
     ) : (
-      <div className="border-t border-[var(--border-light)]">
-        {items.map((r, i) => listRow(r, i))}
-      </div>
+      <>
+        {/* Card fallback for mobile */}
+        <div className="grid grid-cols-1 gap-3 md:hidden">
+          {items.map((r, i) => card(r, i))}
+        </div>
+        {/* List view for md+ */}
+        <div className="hidden md:block border-t border-[var(--border-light)]">
+          {items.map((r, i) => listRow(r, i))}
+        </div>
+      </>
     );
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex flex-col">
+    <div className={`bg-[var(--background)] text-[var(--foreground)] flex flex-col ${!hasSearched ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
       <div className="fixed inset-0 opacity-[0.03] pointer-events-none halftone" />
 
       {/* ── Navbar ── */}
@@ -558,13 +561,13 @@ export default function Home() {
 
       {/* ── Pre-search landing ── */}
       {!hasSearched ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 pb-16 sm:pb-20">
-          <div className="w-full max-w-xl text-center space-y-6 sm:space-y-8">
-            <div className="space-y-2 sm:space-y-3">
-              <h1 className="font-comic-title text-3xl sm:text-4xl md:text-5xl uppercase tracking-wide leading-tight">
+        <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6">
+          <div className="w-full max-w-xl text-center space-y-4 sm:space-y-6 md:space-y-8">
+            <div className="space-y-1.5 sm:space-y-2 md:space-y-3">
+              <h1 className="font-comic-title text-2xl sm:text-4xl md:text-5xl uppercase tracking-wide leading-tight">
                 Domain search, <span className="comic-highlight">sorted</span>
               </h1>
-              <p className="font-comic-body text-sm sm:text-base md:text-lg text-[var(--foreground)]/60 max-w-lg mx-auto">
+              <p className="font-comic-body text-xs sm:text-base md:text-lg text-[var(--foreground)]/60 max-w-lg mx-auto">
                 One search. Prices from GoDaddy, Namecheap & more. RDAP lookups for taken domains.
               </p>
             </div>
@@ -575,15 +578,15 @@ export default function Home() {
               <p className="text-sm font-bold text-[var(--accent-red,#ff5252)]">{error}</p>
             )}
 
-            <div className="pt-2">
-              <p className="text-xs font-bold uppercase tracking-widest opacity-30 mb-3">Try searching</p>
-              <div className="flex flex-wrap justify-center gap-2">
+            <div className="pt-1 sm:pt-2">
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest opacity-30 mb-2 sm:mb-3">Try searching</p>
+              <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
                 {HOT_DOMAINS.map((domain) => (
                   <button
                     key={domain}
                     type="button"
                     onClick={() => { setKeyword(domain); setError(null); }}
-                    className="font-comic-body px-3 py-1.5 text-sm font-bold border border-[var(--border-light)] bg-[var(--surface)] hover:border-[var(--border)] transition-colors"
+                    className="font-comic-body px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-bold border border-[var(--border-light)] bg-[var(--surface)] hover:border-[var(--border)] transition-colors"
                   >
                     {domain}
                   </button>
@@ -641,11 +644,10 @@ export default function Home() {
                               key={f}
                               type="button"
                               onClick={() => setFilter(f)}
-                              className={`px-2.5 py-1.5 text-xs sm:text-sm font-bold uppercase tracking-wide transition-all border whitespace-nowrap ${
-                                filter === f
+                              className={`px-2.5 py-1.5 text-xs sm:text-sm font-bold uppercase tracking-wide transition-all border whitespace-nowrap ${filter === f
                                   ? "bg-[var(--foreground)] text-[var(--background)] border-[var(--foreground)]"
                                   : "bg-[var(--surface)] text-[var(--foreground)] border-[var(--border-light)] hover:border-[var(--border)]"
-                              }`}
+                                }`}
                             >
                               {label} <span className="opacity-60">{count}</span>
                             </button>
@@ -653,7 +655,8 @@ export default function Home() {
                         })}
                       </div>
 
-                      <div className="flex border border-[var(--border-light)]">
+                      {/* View toggle — hidden on mobile since card is always used */}
+                      <div className="hidden md:flex border border-[var(--border-light)]">
                         <button
                           type="button"
                           onClick={() => setViewMode("card")}
@@ -751,9 +754,12 @@ export default function Home() {
       )}
 
       {/* ── Footer ── */}
-      <footer className="py-5 text-center">
+      <footer className={`text-center ${!hasSearched ? 'py-2 sm:py-3' : 'py-5'}`}>
         <p className="text-xs font-bold uppercase tracking-widest opacity-25">
           A Donalabs product · {new Date().getFullYear()}
+        </p>
+        <p className="text-[10px] sm:text-xs opacity-30 mt-1">
+          made with love in 🇮🇳
         </p>
       </footer>
     </div>
