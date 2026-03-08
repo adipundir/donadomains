@@ -366,15 +366,6 @@ export async function searchDomainsMultiSource(keyword: string): Promise<SearchD
 
     let buyLinks = available && !isPremium ? buildMergedBuyLinks(domain, searchHits) : [];
 
-    // Fallback buy links if domain is available but no pricing scraped
-    if (available && !isPremium && buyLinks.length === 0) {
-      buyLinks = ALL_REGISTRARS.slice(0, 3).map(r => ({
-        name: r.name,
-        url: r.buildBuyUrl(domain),
-        source: "scraped" as const
-      }));
-    }
-
     results.push({
       domain,
       available,
