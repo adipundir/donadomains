@@ -19,20 +19,13 @@ async function fetchFromApi(): Promise<Map<string, RegistrarPriceResult> | null>
   if (inflightPromise) return inflightPromise;
 
   inflightPromise = (async () => {
-    const start = Date.now();
-    console.log(`[${NAME}] Fetching pricing from Cloudflare-Datamining...`);
-
     try {
       const res = await fetch(PRICING_URL, {
         headers: { Accept: "application/json", "User-Agent": "donadomains/1.0" },
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
 
-      const elapsed = Date.now() - start;
-      if (!res.ok) {
-        console.log(`[${NAME}] ✗ HTTP ${res.status} (${elapsed}ms)`);
-        return null;
-      }
+      if (!res.ok) return null;
 
       const data: CloudflarePricingData = await res.json();
       const map = new Map<string, RegistrarPriceResult>();
@@ -48,16 +41,9 @@ async function fetchFromApi(): Promise<Map<string, RegistrarPriceResult> | null>
         }
       }
 
-      const samples = ["com", "net", "org", "io", "xyz"].map(t => {
-        const p = map.get(t);
-        return p ? `.${t}=$${p.registration}` : null;
-      }).filter(Boolean).join(", ");
-      console.log(`[${NAME}] ✓ ${map.size} TLDs in ${elapsed}ms — ${samples}`);
-
       cache = map;
       return map;
-    } catch (err) {
-      console.log(`[${NAME}] ✗ ERROR: ${(err as Error).message}`);
+    } catch {
       return null;
     } finally {
       inflightPromise = null;

@@ -210,6 +210,8 @@ export function logRawMarkdown(registrar: string, markdown: string, maxLines = 4
  * with regex. Markdown formatting is stripped and promotional/savings
  * text is filtered before price extraction.
  */
+const DEBUG_SCRAPE = process.env.DEBUG_SCRAPE === "1";
+
 export async function searchRegistrarPage(
   registrarName: string,
   url: string,
@@ -217,27 +219,21 @@ export async function searchRegistrarPage(
   waitMs = 6000,
 ): Promise<{ hits: RegistrarSearchHit[]; fetchTimeMs: number; error?: string }> {
   const start = Date.now();
-  console.log(`[${registrarName}] Searching: ${url}`);
 
   try {
     const result = await firecrawlScrape(url, waitMs);
     const elapsed = Date.now() - start;
 
     if (!result.success || !result.markdown) {
-      console.log(`[${registrarName}] ✗ Scrape failed (${elapsed}ms): ${result.error}`);
       return { hits: [], fetchTimeMs: elapsed, error: result.error };
     }
 
-    console.log(`[${registrarName}] ← Scraped ${result.markdown.length} chars (${elapsed}ms)`);
-    logRawMarkdown(registrarName, result.markdown);
+    if (DEBUG_SCRAPE) logRawMarkdown(registrarName, result.markdown);
     const hits = parseSearchMarkdown(result.markdown, buildBuyUrl);
-    const avail = hits.filter((h) => h.available).length;
-    console.log(`[${registrarName}] ✓ Found ${hits.length} domains (${avail} available)`);
-    logSearchHits(registrarName, hits);
+    if (DEBUG_SCRAPE) logSearchHits(registrarName, hits);
     return { hits, fetchTimeMs: elapsed };
   } catch (err) {
     const elapsed = Date.now() - start;
-    console.log(`[${registrarName}] ✗ Error (${elapsed}ms): ${(err as Error).message}`);
     return { hits: [], fetchTimeMs: elapsed, error: (err as Error).message };
   }
 }

@@ -1,10 +1,6 @@
 import dns from "dns";
 import { promisify } from "util";
-import {
-  preloadAllPricing,
-  searchAllRegistrars,
-  buildMergedBuyLinks,
-} from "./registrars";
+import { searchAllRegistrars, buildMergedBuyLinks } from "./registrars";
 import type { BuyLink, RegistrarSearchResult, RegistrarSearchHit } from "./registrars";
 
 const dnsResolve = promisify(dns.resolve);
@@ -75,7 +71,7 @@ function parseKeyword(keyword: string): { baseName: string; userTld?: string } {
 const IANA_BOOTSTRAP_URL = "https://data.iana.org/rdap/dns.json";
 const RDAP_DIRECT_TIMEOUT_MS = 3000;
 const RDAP_FALLBACK_TIMEOUT_MS = 5000;
-const RDAP_DETAILS_TIMEOUT_MS = 5000;
+const RDAP_DETAILS_TIMEOUT_MS = 4000;
 
 let bootstrapCache: Map<string, string> | null = null;
 let bootstrapPromise: Promise<Map<string, string>> | null = null;
@@ -201,11 +197,7 @@ function buildContactString(v: { email?: string | null; tel?: string | null; adr
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
-export async function fetchRdapDetails(domain: string): Promise<DomainRegistrationDetails | null> {
-  try {
-    const res = await rdapFetch(domain, RDAP_DETAILS_TIMEOUT_MS);
-    if (!res.ok) return null;
-    const raw = (await res.json()) as Record<string, unknown>;
+function parseRdapResponse(raw: Record<string, unknown>): DomainRegistrationDetails | null {
     type RdapData = { events?: Array<{ eventAction?: string; eventDate?: string }>; entities?: RdapEntity[]; status?: string[] };
     const rawCast = raw as { events?: unknown; domain?: RdapData; entities?: unknown; ldhName?: string };
     const data: RdapData | null =
@@ -271,12 +263,20 @@ export async function fetchRdapDetails(domain: string): Promise<DomainRegistrati
     if (!out.registrar && typeof rawAny.registrar === "string") out.registrar = rawAny.registrar;
     if (!out.registrant && typeof rawAny.registrant === "string") out.registrant = rawAny.registrant;
 
-    if (process.env.LOG_RDAP !== "0") {
-      console.log(`[RDAP][${domain}] registrar=${out.registrar ?? "—"} registrant=${out.registrant ?? "—"} created=${out.created ?? "—"}`);
-    }
     return Object.keys(out).length > 0 ? out : null;
-  } catch (err) {
-    if (process.env.LOG_RDAP !== "0") console.log(`[RDAP][${domain}] ERROR: ${(err as Error).message}`);
+}
+
+export async function fetchRdapDetails(domain: string): Promise<DomainRegistrationDetails | null> {
+  try {
+    let res = await rdapFetch(domain, RDAP_DETAILS_TIMEOUT_MS);
+    if (!res.ok && res.status === 404) {
+      const fallback = await fetch(`https://rdap.org/domain/${domain}`, { signal: AbortSignal.timeout(RDAP_DETAILS_TIMEOUT_MS) });
+      if (fallback.ok) res = fallback;
+    }
+    if (!res.ok) return null;
+    const raw = (await res.json()) as Record<string, unknown>;
+    return parseRdapResponse(raw);
+  } catch {
     return null;
   }
 }
@@ -343,19 +343,17 @@ export interface SearchDomainsMultiSourceResult {
 /**
  * Main search pipeline.
  *
- * Runs three strategies in parallel:
- * 1. Registrar search: scrape GoDaddy, Namecheap, Porkbun, Spaceship search pages
+ * Runs two strategies in parallel:
+ * 1. Registrar search: scrape GoDaddy, Namecheap, Dynadot, Spaceship, etc. search pages
  *    via Firecrawl → each returns availability + pricing for many domains in ONE request
  * 2. RDAP/DNS: check availability for keyword + common TLDs (ground truth)
- * 3. Bulk pricing: Porkbun API, Cloudflare GitHub data, static fallbacks
  *
- * Then merges everything: registrar search results provide fresh prices + suggestions,
- * RDAP provides reliable availability, bulk pricing fills gaps.
+ * Then merges: registrar search results provide fresh prices + buy links,
+ * RDAP provides reliable availability.
  */
 export async function searchDomainsMultiSource(keyword: string): Promise<SearchDomainsMultiSourceResult> {
   const startTime = Date.now();
   const { baseName, userTld } = parseKeyword(keyword);
-  console.log(`\n[Search] ═══ "${keyword}" → base="${baseName}" tld=${userTld ?? "auto"} ═══`);
 
   if (!baseName) return { results: [], sourceStatuses: [] };
 
@@ -380,14 +378,9 @@ export async function searchDomainsMultiSource(keyword: string): Promise<SearchD
   const allCandidates = [...exactDomains, ...similarDomains];
 
   // ─── Phase 1: Run everything in parallel ───
-  // All three run concurrently. Pricing (Porkbun API ~17s, Cloudflare ~400ms)
-  // runs alongside registrar scraping (~10-20s) so it doesn't add wall time.
-  // We await all of them so bulk API pricing is guaranteed to be available
-  // when building merged buy links in Phase 5.
   const [registrarResults, rdapAvailability] = await Promise.all([
     searchAllRegistrars(baseName),
     checkAllAvailability(allCandidates),
-    preloadAllPricing(),
   ]);
 
   // ─── Phase 2: Build domain → registrar hits map ───
@@ -478,30 +471,27 @@ export async function searchDomainsMultiSource(keyword: string): Promise<SearchD
   }
 
   // ─── Phase 6: Sort results ───
+  // Priority: available first → user's TLD → exact match → popular TLD → more buy links
   results.sort((a, b) => {
     if (a.available !== b.available) return a.available ? -1 : 1;
-    const exactA = a.matchType === "exact" ? 0 : 1;
-    const exactB = b.matchType === "exact" ? 0 : 1;
-    if (exactA !== exactB) return exactA - exactB;
     if (userTld) {
       if (a.tld === userTld && b.tld !== userTld) return -1;
       if (a.tld !== userTld && b.tld === userTld) return 1;
     }
-    // Prefer domains with more buy links (more data)
-    const linksA = a.buyLinks?.length ?? 0;
-    const linksB = b.buyLinks?.length ?? 0;
-    if (linksA !== linksB) return linksB - linksA;
-    return tldSortKey(a.tld) - tldSortKey(b.tld);
+    const exactA = a.matchType === "exact" ? 0 : 1;
+    const exactB = b.matchType === "exact" ? 0 : 1;
+    if (exactA !== exactB) return exactA - exactB;
+    const tldDiff = tldSortKey(a.tld) - tldSortKey(b.tld);
+    if (tldDiff !== 0) return tldDiff;
+    return (b.buyLinks?.length ?? 0) - (a.buyLinks?.length ?? 0);
   });
 
   // ─── Phase 7: Fetch RDAP details for taken domains ───
-  // Only fetch the first 20 (most relevant), with a hard 5s timeout.
   const MAX_RDAP_DETAILS = 20;
-  const RDAP_BATCH_TIMEOUT_MS = 5000;
+  const RDAP_BATCH_TIMEOUT_MS = 6000;
   const taken = results.filter((r) => !r.available);
   const takenToFetch = taken.slice(0, MAX_RDAP_DETAILS);
   if (takenToFetch.length > 0) {
-    console.log(`[RDAP] Fetching details for ${takenToFetch.length}/${taken.length} taken domains (${RDAP_BATCH_TIMEOUT_MS}ms cap)...`);
     const detailsPromise = Promise.all(takenToFetch.map((r) => fetchRdapDetails(r.domain)));
     const details = await Promise.race([
       detailsPromise,
@@ -510,19 +500,7 @@ export async function searchDomainsMultiSource(keyword: string): Promise<SearchD
       ),
     ]);
     details.forEach((d, i) => { if (d) takenToFetch[i].registration = d; });
-    const fetched = details.filter(Boolean).length;
-    console.log(`[RDAP] Got details for ${fetched}/${takenToFetch.length}${taken.length > MAX_RDAP_DETAILS ? ` (${taken.length - MAX_RDAP_DETAILS} skipped)` : ""}`);
   }
-
-  // ─── Phase 8: Log summary ───
-  const elapsed = Date.now() - startTime;
-  const availCount = results.filter((r) => r.available).length;
-  const withPrices = results.filter((r) => (r.buyLinks?.length ?? 0) > 0).length;
-  const fromSearch = [...domainSearchHits.keys()].length;
-
-  console.log(`\n[Search] ═══ COMPLETE in ${elapsed}ms ═══`);
-  console.log(`[Search] ${results.length} domains: ${availCount} available, ${results.length - availCount} taken`);
-  console.log(`[Search] ${withPrices} with pricing | ${fromSearch} from registrar searches`);
 
   const sourceStatuses: SourceStatus[] = [
     { name: "RDAP/DNS", status: "ok", count: rdapAvailability.size },
@@ -541,12 +519,9 @@ export async function searchDomainsMultiSource(keyword: string): Promise<SearchD
  * Check RDAP/DNS availability for a batch of domains in parallel.
  * Returns a map of domain → available.
  */
-const RDAP_PER_DOMAIN_TIMEOUT_MS = 4000;
+const RDAP_PER_DOMAIN_TIMEOUT_MS = 3000;
 
 async function checkAllAvailability(domains: string[]): Promise<Map<string, boolean>> {
-  console.log(`[RDAP] Checking availability for ${domains.length} domains...`);
-  const start = Date.now();
-
   const results = await Promise.all(
     domains.map(async (domain) => {
       try {
@@ -565,10 +540,6 @@ async function checkAllAvailability(domains: string[]): Promise<Map<string, bool
 
   const map = new Map<string, boolean>();
   for (const r of results) map.set(r.domain, r.available);
-
-  const availCount = [...map.values()].filter(Boolean).length;
-  console.log(`[RDAP] Done in ${Date.now() - start}ms: ${availCount} available, ${map.size - availCount} taken`);
-
   return map;
 }
 

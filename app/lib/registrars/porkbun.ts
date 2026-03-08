@@ -21,9 +21,6 @@ async function fetchFromApi(): Promise<Map<string, RegistrarPriceResult> | null>
   if (inflightPromise) return inflightPromise;
 
   inflightPromise = (async () => {
-    const start = Date.now();
-    console.log(`[${NAME}] Fetching live pricing from API...`);
-
     try {
       const res = await fetch(API_URL, {
         method: "POST",
@@ -31,9 +28,6 @@ async function fetchFromApi(): Promise<Map<string, RegistrarPriceResult> | null>
         body: "{}",
         signal: AbortSignal.timeout(API_TIMEOUT_MS),
       });
-
-      const elapsed = Date.now() - start;
-      console.log(`[${NAME}] ← HTTP ${res.status} (${elapsed}ms)`);
 
       if (!res.ok) return null;
 
@@ -55,16 +49,9 @@ async function fetchFromApi(): Promise<Map<string, RegistrarPriceResult> | null>
         }
       }
 
-      const samples = ["com", "net", "org", "xyz", "io"].map(t => {
-        const p = map.get(t);
-        return p ? `.${t}=$${p.registration}` : null;
-      }).filter(Boolean).join(", ");
-      console.log(`[${NAME}] ✓ API: ${map.size} TLDs in ${elapsed}ms — ${samples}`);
-
       apiCache = map;
       return map;
-    } catch (err) {
-      console.log(`[${NAME}] ✗ API ERROR: ${(err as Error).message}`);
+    } catch {
       return null;
     } finally {
       inflightPromise = null;
@@ -109,7 +96,6 @@ async function fetchPricing(): Promise<RegistrarFetchResult> {
     return { registrar: NAME, source: "api", tldCount: result.size, fetchTimeMs: elapsed };
   }
 
-  console.log(`[${NAME}] ✗ API failed — no pricing available`);
   return { registrar: NAME, source: "api", tldCount: 0, fetchTimeMs: elapsed, error: "API failed" };
 }
 

@@ -1,9 +1,8 @@
 /**
  * Comprehensive test for the full search pipeline:
  * 1. Registrar search (Firecrawl scraping of search pages)
- * 2. Bulk pricing (API + static fallback)
- * 3. RDAP availability checking
- * 4. Merged results with buy links
+ * 2. RDAP availability checking
+ * 3. Merged results with buy links from scraped prices
  */
 import "dotenv/config";
 import { searchDomainsMultiSource } from "../app/lib/domain-scraper";
