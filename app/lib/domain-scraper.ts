@@ -380,18 +380,14 @@ export async function searchDomainsMultiSource(keyword: string): Promise<SearchD
   const allCandidates = [...exactDomains, ...similarDomains];
 
   // ─── Phase 1: Run everything in parallel ───
-  // Pricing fires concurrently but we don't block on it — Porkbun API is slow (~12s).
-  // Cloudflare finishes in ~400ms so it'll be ready. Porkbun caches in background.
-  const PRICING_TIMEOUT_MS = 3000;
-  const pricingRace = Promise.race([
-    preloadAllPricing(),
-    new Promise<void>((resolve) => setTimeout(resolve, PRICING_TIMEOUT_MS)),
-  ]);
-
+  // All three run concurrently. Pricing (Porkbun API ~17s, Cloudflare ~400ms)
+  // runs alongside registrar scraping (~10-20s) so it doesn't add wall time.
+  // We await all of them so bulk API pricing is guaranteed to be available
+  // when building merged buy links in Phase 5.
   const [registrarResults, rdapAvailability] = await Promise.all([
     searchAllRegistrars(baseName),
     checkAllAvailability(allCandidates),
-    pricingRace,
+    preloadAllPricing(),
   ]);
 
   // ─── Phase 2: Build domain → registrar hits map ───

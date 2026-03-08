@@ -6,18 +6,11 @@ import type {
 } from "./types";
 import { searchRegistrarPage } from "./parse-utils";
 
-const NAME = "Namecheap";
-
-const SEARCH_URL = (q: string) =>
-  `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(q)}`;
-
-/** Prices scraped from Namecheap search pages via Firecrawl. */
-let scrapedPrices: Map<string, RegistrarPriceResult> | null = null;
-
+const NAME = "Squarespace";
 
 async function searchDomains(query: string): Promise<RegistrarSearchResult> {
-  const url = SEARCH_URL(query);
-  const { hits, fetchTimeMs, error } = await searchRegistrarPage(NAME, url, buildBuyUrl, 8000);
+  const url = `https://domains.squarespace.com/#/${encodeURIComponent(query)}`;
+  const { hits, fetchTimeMs, error } = await searchRegistrarPage(NAME, url, buildBuyUrl, 10000);
 
   const now = Date.now();
   if (!scrapedPrices) scrapedPrices = new Map();
@@ -37,13 +30,15 @@ async function searchDomains(query: string): Promise<RegistrarSearchResult> {
   return { registrar: NAME, hits, fetchTimeMs, error };
 }
 
+let scrapedPrices: Map<string, RegistrarPriceResult> | null = null;
+
 function getPrice(tld: string): RegistrarPriceResult | null {
   const key = tld.replace(/^\./, "").toLowerCase();
   return scrapedPrices?.get(key) ?? null;
 }
 
 function buildBuyUrl(domain: string): string {
-  return `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(domain)}`;
+  return `https://domains.squarespace.com/#/${encodeURIComponent(domain)}`;
 }
 
 async function fetchPricing(): Promise<RegistrarFetchResult> {
@@ -51,5 +46,5 @@ async function fetchPricing(): Promise<RegistrarFetchResult> {
   return { registrar: NAME, source: count > 0 ? "scraped" : "api", tldCount: count, fetchTimeMs: 0 };
 }
 
-const namecheap: RegistrarModule = { name: NAME, fetchPricing, getPrice, buildBuyUrl, searchDomains };
-export default namecheap;
+const squarespace: RegistrarModule = { name: NAME, fetchPricing, getPrice, buildBuyUrl, searchDomains };
+export default squarespace;

@@ -5,6 +5,7 @@
  * 3. RDAP availability checking
  * 4. Merged results with buy links
  */
+import "dotenv/config";
 import { searchDomainsMultiSource } from "../app/lib/domain-scraper";
 
 const TEST_QUERY = process.argv[2] || "donataxes";

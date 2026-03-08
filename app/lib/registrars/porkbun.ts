@@ -4,9 +4,6 @@ import type {
   RegistrarModule,
   RegistrarSearchResult,
 } from "./types";
-import { firecrawlScrape } from "./firecrawl-client";
-import { parseSearchMarkdown, logSearchHits, logRawMarkdown } from "./parse-utils";
-
 const NAME = "Porkbun";
 const API_URL = "https://api.porkbun.com/api/json/v3/pricing/get";
 const API_TIMEOUT_MS = 45_000;
@@ -15,9 +12,6 @@ type PorkbunApiResponse = {
   status?: string;
   pricing?: Record<string, { registration?: string; renewal?: string }>;
 };
-
-const SEARCH_URL = (q: string) =>
-  `https://porkbun.com/checkout/search?q=${encodeURIComponent(q)}`;
 
 let apiCache: Map<string, RegistrarPriceResult> | null = null;
 let inflightPromise: Promise<Map<string, RegistrarPriceResult> | null> | null = null;
@@ -81,32 +75,15 @@ async function fetchFromApi(): Promise<Map<string, RegistrarPriceResult> | null>
 }
 
 
-async function searchDomains(query: string): Promise<RegistrarSearchResult> {
-  const start = Date.now();
-  const url = SEARCH_URL(query);
-  console.log(`[${NAME}] Searching: ${url}`);
-
-  try {
-    const result = await firecrawlScrape(url, 6000);
-    const elapsed = Date.now() - start;
-
-    if (!result.success || !result.markdown) {
-      console.log(`[${NAME}] ✗ Scrape failed (${elapsed}ms): ${result.error}`);
-      return { registrar: NAME, hits: [], fetchTimeMs: elapsed, error: result.error };
-    }
-
-    console.log(`[${NAME}] ← Scraped ${result.markdown.length} chars (${elapsed}ms)`);
-    logRawMarkdown(NAME, result.markdown);
-    const hits = parseSearchMarkdown(result.markdown, buildBuyUrl);
-    console.log(`[${NAME}] ✓ Found ${hits.length} domains (${hits.filter(h => h.available).length} available)`);
-    logSearchHits(NAME, hits);
-
-    return { registrar: NAME, hits, fetchTimeMs: elapsed };
-  } catch (err) {
-    const elapsed = Date.now() - start;
-    console.log(`[${NAME}] ✗ Error (${elapsed}ms): ${(err as Error).message}`);
-    return { registrar: NAME, hits: [], fetchTimeMs: elapsed, error: (err as Error).message };
-  }
+/**
+ * Porkbun's search page is a heavy SPA that doesn't render results within
+ * Firecrawl's waitFor window (returns "Loading..." spinners). Scraping it
+ * produces no usable data. Instead, Porkbun contributes via getPrice() which
+ * uses the Porkbun bulk pricing API — accurate per-TLD pricing that gets
+ * merged in Phase 2 of buildMergedBuyLinks.
+ */
+async function searchDomains(): Promise<RegistrarSearchResult> {
+  return { registrar: NAME, hits: [], fetchTimeMs: 0 };
 }
 
 function getPrice(tld: string): RegistrarPriceResult | null {

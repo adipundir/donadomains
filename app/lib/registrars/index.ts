@@ -10,6 +10,11 @@ import godaddy from "./godaddy";
 import namecheap from "./namecheap";
 import cloudflare from "./cloudflare";
 import spaceship from "./spaceship";
+import dynadot from "./dynadot";
+import namecom from "./namecom";
+import hover from "./hover";
+import hostinger from "./hostinger";
+import squarespace from "./squarespace";
 
 export type { BuyLink, RegistrarFetchResult, RegistrarSearchResult, RegistrarSearchHit } from "./types";
 
@@ -19,6 +24,11 @@ const ALL_REGISTRARS: RegistrarModule[] = [
   namecheap,
   godaddy,
   spaceship,
+  dynadot,
+  namecom,
+  hover,
+  hostinger,
+  squarespace,
 ];
 
 let preloaded = false;

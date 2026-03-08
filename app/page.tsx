@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTheme } from "next-themes";
 import { searchDomainsAction } from "./actions";
 
@@ -106,6 +106,19 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [searchedKeyword, setSearchedKeyword] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "available" | "taken">("all");
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      setShowScrollTop(window.scrollY > window.innerHeight);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -498,7 +511,7 @@ export default function Home() {
                     className={`px-3 py-1.5 comic-border-thin transition-colors ${
                       filter === "taken"
                         ? "bg-[var(--foreground)] text-[var(--surface)]"
-                        : "bg-[var(--surface-muted)] hover:opacity-80"
+                        : "bg-[var(--surface)] hover:opacity-80"
                     }`}
                   >
                     {takenResults.length} Taken
@@ -544,19 +557,19 @@ export default function Home() {
                 </>
               ) : (
                 <>
-                  {restTaken.length > 0 && (
-                    <>
-                      <h3 className="font-comic-title text-lg uppercase tracking-wide mb-4">Taken</h3>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-10">
-                        {restTaken.map((r, i) => card(r, i))}
-                      </div>
-                    </>
-                  )}
                   {restAvailable.length > 0 && (
                     <>
                       <h3 className="font-comic-title text-lg uppercase tracking-wide mb-4">Available — register now</h3>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-10">
                         {restAvailable.map((r, i) => card(r, i))}
+                      </div>
+                    </>
+                  )}
+                  {restTaken.length > 0 && (
+                    <>
+                      <h3 className="font-comic-title text-lg uppercase tracking-wide mb-4">Taken</h3>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        {restTaken.map((r, i) => card(r, i))}
                       </div>
                     </>
                   )}
@@ -576,6 +589,21 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* Scroll to top */}
+      {showScrollTop && (
+        <button
+          type="button"
+          onClick={scrollToTop}
+          aria-label="Scroll to top"
+          className="fixed bottom-6 right-6 z-50 h-12 w-12 flex items-center justify-center bg-[var(--foreground)] text-[var(--background)] border-[3px] border-[var(--foreground)] comic-btn transition-all hover:scale-110 focus:outline-none"
+          style={{ boxShadow: "4px 4px 0px var(--foreground)" }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M18 15l-6-6-6 6" />
+          </svg>
+        </button>
+      )}
 
       {/* Footer: anchored at bottom */}
       <footer className="py-6 text-center bg-[var(--background)]">

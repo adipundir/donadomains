@@ -6,14 +6,12 @@ import type {
 } from "./types";
 import { searchRegistrarPage } from "./parse-utils";
 
-const NAME = "Namecheap";
+const NAME = "Hostinger";
 
 const SEARCH_URL = (q: string) =>
-  `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(q)}`;
+  `https://www.hostinger.com/domain-name-search?search=${encodeURIComponent(q)}`;
 
-/** Prices scraped from Namecheap search pages via Firecrawl. */
 let scrapedPrices: Map<string, RegistrarPriceResult> | null = null;
-
 
 async function searchDomains(query: string): Promise<RegistrarSearchResult> {
   const url = SEARCH_URL(query);
@@ -43,7 +41,7 @@ function getPrice(tld: string): RegistrarPriceResult | null {
 }
 
 function buildBuyUrl(domain: string): string {
-  return `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(domain)}`;
+  return `https://www.hostinger.com/domain-name-search?search=${encodeURIComponent(domain)}`;
 }
 
 async function fetchPricing(): Promise<RegistrarFetchResult> {
@@ -51,5 +49,5 @@ async function fetchPricing(): Promise<RegistrarFetchResult> {
   return { registrar: NAME, source: count > 0 ? "scraped" : "api", tldCount: count, fetchTimeMs: 0 };
 }
 
-const namecheap: RegistrarModule = { name: NAME, fetchPricing, getPrice, buildBuyUrl, searchDomains };
-export default namecheap;
+const hostinger: RegistrarModule = { name: NAME, fetchPricing, getPrice, buildBuyUrl, searchDomains };
+export default hostinger;
