@@ -1,7 +1,11 @@
 import dns from "dns";
 import { promisify } from "util";
-import { preloadAllPricing, getBuyLinks } from "./registrars";
-import type { BuyLink } from "./registrars";
+import {
+  preloadAllPricing,
+  searchAllRegistrars,
+  buildMergedBuyLinks,
+} from "./registrars";
+import type { BuyLink, RegistrarSearchResult, RegistrarSearchHit } from "./registrars";
 
 const dnsResolve = promisify(dns.resolve);
 
@@ -40,8 +44,16 @@ export interface SourceStatus {
   error?: string;
 }
 
-const COMMON_TLDS = [".com", ".net", ".org", ".io", ".co", ".dev", ".app", ".ai", ".xyz", ".me", ".info", ".biz", ".us", ".tv", ".online", ".site", ".tech", ".store", ".club", ".world"];
-const TLD_ORDER: Record<string, number> = Object.fromEntries(COMMON_TLDS.map((tld, i) => [tld, i]));
+const COMMON_TLDS = [
+  ".com", ".net", ".org", ".io", ".co", ".dev", ".app", ".ai",
+  ".xyz", ".me", ".info", ".biz", ".us", ".tv", ".online", ".site",
+  ".tech", ".store", ".club", ".world",
+];
+
+const TLD_ORDER: Record<string, number> = Object.fromEntries(
+  COMMON_TLDS.map((tld, i) => [tld, i])
+);
+
 function tldSortKey(tld: string): number {
   return TLD_ORDER[tld] ?? 999;
 }
@@ -58,16 +70,12 @@ function parseKeyword(keyword: string): { baseName: string; userTld?: string } {
   return { baseName: lower.replace(/[^a-z0-9-]/g, "") };
 }
 
-const SIMILAR_SUFFIXES = ["online", "hub", "app", "io", "hq"];
-const SIMILAR_PREFIXES = ["my", "get", "the", "go"];
-const SIMILAR_TLDS = [".com", ".net", ".org"];
-
 // ─── RDAP Bootstrap ─────────────────────────────────────────────────────────
 
 const IANA_BOOTSTRAP_URL = "https://data.iana.org/rdap/dns.json";
 const RDAP_DIRECT_TIMEOUT_MS = 3000;
 const RDAP_FALLBACK_TIMEOUT_MS = 5000;
-const RDAP_DETAILS_TIMEOUT_MS = 8000;
+const RDAP_DETAILS_TIMEOUT_MS = 5000;
 
 let bootstrapCache: Map<string, string> | null = null;
 let bootstrapPromise: Promise<Map<string, string>> | null = null;
@@ -92,9 +100,7 @@ async function loadBootstrap(): Promise<Map<string, string>> {
         for (let i = 0; i < tlds.length; i++) {
           const tld = String(tlds[i]).toLowerCase();
           const url = urls[i] ?? urls[0];
-          if (tld && url) {
-            map.set(tld, url.endsWith("/") ? url : `${url}/`);
-          }
+          if (tld && url) map.set(tld, url.endsWith("/") ? url : `${url}/`);
         }
       }
       bootstrapCache = map;
@@ -157,6 +163,14 @@ async function checkRdapAvailability(domain: string): Promise<{ available: boole
   } catch {
     return { available: false, checked: false };
   }
+}
+
+async function checkAvailability(domain: string): Promise<boolean> {
+  const dns = await checkDnsAvailability(domain);
+  if (dns === false) return false;
+  const rdap = await checkRdapAvailability(domain);
+  if (rdap.checked) return rdap.available;
+  return dns === true;
 }
 
 // ─── RDAP Registration Details ──────────────────────────────────────────────
@@ -258,7 +272,7 @@ export async function fetchRdapDetails(domain: string): Promise<DomainRegistrati
     if (!out.registrant && typeof rawAny.registrant === "string") out.registrant = rawAny.registrant;
 
     if (process.env.LOG_RDAP !== "0") {
-      console.log(`[RDAP][${domain}] registration: registrar=${out.registrar ?? "—"} registrant=${out.registrant ?? "—"} created=${out.created ?? "—"} expires=${out.expires ?? "—"}`);
+      console.log(`[RDAP][${domain}] registrar=${out.registrar ?? "—"} registrant=${out.registrant ?? "—"} created=${out.created ?? "—"}`);
     }
     return Object.keys(out).length > 0 ? out : null;
   } catch (err) {
@@ -315,105 +329,160 @@ function formatTel(tel: string): string {
   return tel;
 }
 
-// ─── Domain Check ───────────────────────────────────────────────────────────
+// ─── Search: merge registrar scrapes + RDAP + pricing ───────────────────────
 
-async function checkOneDomain(
-  domain: string,
-  source: string,
-  sourceUrl: string,
-  matchType: "exact" | "similar"
-): Promise<DomainResult> {
-  const dnsResult = await checkDnsAvailability(domain);
-  let available = false;
-  if (dnsResult === false) {
-    available = false;
-  } else {
-    const rdap = await checkRdapAvailability(domain);
-    if (rdap.checked) {
-      available = rdap.available;
-    } else {
-      available = dnsResult === true;
-    }
-  }
-  const buyLinks = getBuyLinks(domain);
-  return {
-    domain,
-    available,
-    tld: extractTld(domain),
-    source,
-    sourceUrl,
-    matchType,
-    buyLinks,
-    registerUrl: buyLinks[0]?.url,
-  };
-}
-
-// ─── Search ─────────────────────────────────────────────────────────────────
-
-async function searchRegistry(keyword: string): Promise<{ results: DomainResult[]; userTld?: string }> {
-  const startTime = Date.now();
-  const source = "Registry (RDAP/DNS)";
-  const { baseName, userTld } = parseKeyword(keyword);
-  console.log(`[Registry] Parsed keyword: baseName="${baseName}"${userTld ? ` userTld=${userTld}` : ""}`);
-  if (!baseName) return { results: [] };
-
-  const exactDomains = COMMON_TLDS.map((tld) => ({ domain: `${baseName}${tld}`, matchType: "exact" as const }));
-  const exactSet = new Set(exactDomains.map((d) => d.domain));
-
-  const similarDomains: { domain: string; matchType: "similar" }[] = [];
-  for (const suffix of SIMILAR_SUFFIXES) {
-    for (const tld of SIMILAR_TLDS) {
-      const d = baseName + suffix + tld;
-      if (!exactSet.has(d)) similarDomains.push({ domain: d, matchType: "similar" });
-    }
-  }
-  for (const prefix of SIMILAR_PREFIXES) {
-    for (const tld of SIMILAR_TLDS) {
-      const d = prefix + baseName + tld;
-      if (!exactSet.has(d)) similarDomains.push({ domain: d, matchType: "similar" });
-    }
-  }
-
-  const toCheck = [...exactDomains, ...similarDomains];
-  console.log(`[Registry] Checking ${toCheck.length} domains (${exactDomains.length} exact, ${similarDomains.length} similar)`);
-  const sourceUrl = "https://rdap.org";
-
-  // Fetch registrar pricing in parallel with domain availability checks.
-  // IMPORTANT: both are awaited — pricing MUST be ready before enrichment.
-  const [results, fetchResults] = await Promise.all([
-    Promise.all(toCheck.map(({ domain, matchType }) => checkOneDomain(domain, source, sourceUrl, matchType))),
-    preloadAllPricing(),
-  ]);
-
-  const apiSources = fetchResults.filter((r) => r.source === "api").map((r) => r.registrar);
-  const staticSources = fetchResults.filter((r) => r.source === "static").map((r) => r.registrar);
-  console.log(`[Pricing] Sources ready — API: [${apiSources.join(", ") || "none"}] | Static: [${staticSources.join(", ") || "none"}]`);
-
-  // Re-enrich buy links now that ALL pricing is loaded
-  const logPricing = process.env.LOG_PRICING !== "0";
-  for (let i = 0; i < results.length; i++) {
-    const r = results[i];
-    r.buyLinks = getBuyLinks(r.domain, logPricing && i < 5);
-    r.registerUrl = r.buyLinks[0]?.url;
-  }
-
-  const availCount = results.filter((r) => r.available).length;
-  const elapsed = Date.now() - startTime;
-  console.log(`[Registry] Done in ${elapsed}ms: ${availCount} available, ${results.length - availCount} taken`);
-
-  return { results, userTld };
-}
+const SIMILAR_SUFFIXES = ["online", "hub", "app", "io", "hq"];
+const SIMILAR_PREFIXES = ["my", "get", "the", "go"];
+const SIMILAR_TLDS = [".com", ".net", ".org"];
 
 export interface SearchDomainsMultiSourceResult {
   results: DomainResult[];
   sourceStatuses: SourceStatus[];
 }
 
+/**
+ * Main search pipeline.
+ *
+ * Runs three strategies in parallel:
+ * 1. Registrar search: scrape GoDaddy, Namecheap, Porkbun, Spaceship search pages
+ *    via Firecrawl → each returns availability + pricing for many domains in ONE request
+ * 2. RDAP/DNS: check availability for keyword + common TLDs (ground truth)
+ * 3. Bulk pricing: Porkbun API, Cloudflare GitHub data, static fallbacks
+ *
+ * Then merges everything: registrar search results provide fresh prices + suggestions,
+ * RDAP provides reliable availability, bulk pricing fills gaps.
+ */
 export async function searchDomainsMultiSource(keyword: string): Promise<SearchDomainsMultiSourceResult> {
-  const { results: list, userTld } = await searchRegistry(keyword);
-  const sourceStatuses: SourceStatus[] = [{ name: "Registry (RDAP/DNS)", status: "ok", count: list.length }];
+  const startTime = Date.now();
+  const { baseName, userTld } = parseKeyword(keyword);
+  console.log(`\n[Search] ═══ "${keyword}" → base="${baseName}" tld=${userTld ?? "auto"} ═══`);
 
-  list.sort((a, b) => {
+  if (!baseName) return { results: [], sourceStatuses: [] };
+
+  // Generate domain candidates for RDAP checking
+  const exactDomains = COMMON_TLDS.map((tld) => `${baseName}${tld}`);
+  const exactSet = new Set(exactDomains);
+
+  const similarDomains: string[] = [];
+  for (const suffix of SIMILAR_SUFFIXES) {
+    for (const tld of SIMILAR_TLDS) {
+      const d = baseName + suffix + tld;
+      if (!exactSet.has(d)) similarDomains.push(d);
+    }
+  }
+  for (const prefix of SIMILAR_PREFIXES) {
+    for (const tld of SIMILAR_TLDS) {
+      const d = prefix + baseName + tld;
+      if (!exactSet.has(d)) similarDomains.push(d);
+    }
+  }
+
+  const allCandidates = [...exactDomains, ...similarDomains];
+
+  // ─── Phase 1: Run everything in parallel ───
+  // Pricing fires concurrently but we don't block on it — Porkbun API is slow (~12s).
+  // Cloudflare finishes in ~400ms so it'll be ready. Porkbun caches in background.
+  const PRICING_TIMEOUT_MS = 3000;
+  const pricingRace = Promise.race([
+    preloadAllPricing(),
+    new Promise<void>((resolve) => setTimeout(resolve, PRICING_TIMEOUT_MS)),
+  ]);
+
+  const [registrarResults, rdapAvailability] = await Promise.all([
+    searchAllRegistrars(baseName),
+    checkAllAvailability(allCandidates),
+    pricingRace,
+  ]);
+
+  // ─── Phase 2: Build domain → registrar hits map ───
+  // For each domain, collect which registrars found it and at what price
+  const domainSearchHits = new Map<string, Map<string, RegistrarSearchHit>>();
+
+  for (const result of registrarResults) {
+    for (const hit of result.hits) {
+      const d = hit.domain.toLowerCase();
+      if (!domainSearchHits.has(d)) domainSearchHits.set(d, new Map());
+      domainSearchHits.get(d)!.set(result.registrar, hit);
+    }
+  }
+
+  // ─── Phase 3: Build unified domain list ───
+  // Combine domains from RDAP candidates + registrar search discoveries
+  const allDomains = new Set<string>();
+  for (const d of allCandidates) allDomains.add(d);
+  for (const d of domainSearchHits.keys()) allDomains.add(d);
+
+  // ─── Phase 4: Determine availability for each domain ───
+  // Cross-reference RDAP with registrar data. Aftermarket/premium domains can
+  // return RDAP 404 (looks "available") while registrars correctly list them as taken.
+  const domainAvailability = new Map<string, boolean>();
+  const premiumDomains = new Set<string>();
+
+  for (const domain of allDomains) {
+    const rdapResult = rdapAvailability.get(domain);
+    const hits = domainSearchHits.get(domain);
+    const registrarVotes = hits ? [...hits.values()] : [];
+    const anyPremium = registrarVotes.some((h) => h.premium);
+    const anyTaken = registrarVotes.some((h) => !h.available);
+    const anyAvailable = registrarVotes.some((h) => h.available);
+
+    if (anyPremium) premiumDomains.add(domain);
+
+    // Premium/aftermarket overrides everything — NOT available at standard price
+    if (anyPremium) {
+      domainAvailability.set(domain, false);
+      continue;
+    }
+
+    // RDAP is ground truth for non-premium domains
+    if (rdapResult !== undefined) {
+      domainAvailability.set(domain, rdapResult);
+      continue;
+    }
+
+    // No RDAP data — fall back to registrar consensus
+    if (registrarVotes.length > 0) {
+      const availVotes = registrarVotes.filter((h) => h.available).length;
+      domainAvailability.set(domain, availVotes > registrarVotes.length / 2);
+      continue;
+    }
+
+    domainAvailability.set(domain, false);
+  }
+
+  // ─── Phase 5: Build DomainResult for each domain ───
+  const results: DomainResult[] = [];
+
+  for (const domain of allDomains) {
+    const tld = extractTld(domain);
+    const available = domainAvailability.get(domain) ?? false;
+    const isPremium = premiumDomains.has(domain);
+    const isExact = exactSet.has(domain);
+    const isRegistrarDiscovery = !exactSet.has(domain) && !similarDomains.includes(domain);
+
+    const searchHits = domainSearchHits.get(domain) ?? new Map<string, RegistrarSearchHit>();
+
+    // Only build buy links for genuinely available (non-premium) domains.
+    // Premium domains get shown as taken — standard TLD prices would be misleading.
+    const buyLinks = available && !isPremium ? buildMergedBuyLinks(domain, searchHits) : [];
+
+    const sourceParts: string[] = [];
+    if (rdapAvailability.has(domain)) sourceParts.push("RDAP");
+    if (searchHits.size > 0) sourceParts.push(...[...searchHits.keys()]);
+
+    results.push({
+      domain,
+      available,
+      tld,
+      source: sourceParts.join(" + ") || "RDAP",
+      matchType: isExact ? "exact" : isRegistrarDiscovery ? "similar" : "similar",
+      buyLinks,
+      registerUrl: buyLinks[0]?.url,
+    });
+  }
+
+  // ─── Phase 6: Sort results ───
+  results.sort((a, b) => {
     if (a.available !== b.available) return a.available ? -1 : 1;
     const exactA = a.matchType === "exact" ? 0 : 1;
     const exactB = b.matchType === "exact" ? 0 : 1;
@@ -422,33 +491,89 @@ export async function searchDomainsMultiSource(keyword: string): Promise<SearchD
       if (a.tld === userTld && b.tld !== userTld) return -1;
       if (a.tld !== userTld && b.tld === userTld) return 1;
     }
+    // Prefer domains with more buy links (more data)
+    const linksA = a.buyLinks?.length ?? 0;
+    const linksB = b.buyLinks?.length ?? 0;
+    if (linksA !== linksB) return linksB - linksA;
     return tldSortKey(a.tld) - tldSortKey(b.tld);
   });
 
-  // Fetch RDAP details for taken domains
-  const taken = list.filter((r) => !r.available);
-  if (taken.length > 0) {
-    console.log(`[RDAP] Fetching registration details for ${taken.length} taken domains`);
-    const detailsResults = await Promise.all(taken.map((r) => fetchRdapDetails(r.domain)));
-    const fetched = detailsResults.filter(Boolean).length;
-    detailsResults.forEach((details, i) => {
-      if (details) taken[i].registration = details;
-    });
-    console.log(`[RDAP] Got details for ${fetched}/${taken.length} taken domains`);
+  // ─── Phase 7: Fetch RDAP details for taken domains ───
+  // Only fetch the first 20 (most relevant), with a hard 5s timeout.
+  const MAX_RDAP_DETAILS = 20;
+  const RDAP_BATCH_TIMEOUT_MS = 5000;
+  const taken = results.filter((r) => !r.available);
+  const takenToFetch = taken.slice(0, MAX_RDAP_DETAILS);
+  if (takenToFetch.length > 0) {
+    console.log(`[RDAP] Fetching details for ${takenToFetch.length}/${taken.length} taken domains (${RDAP_BATCH_TIMEOUT_MS}ms cap)...`);
+    const detailsPromise = Promise.all(takenToFetch.map((r) => fetchRdapDetails(r.domain)));
+    const details = await Promise.race([
+      detailsPromise,
+      new Promise<(DomainRegistrationDetails | null)[]>((resolve) =>
+        setTimeout(() => resolve(takenToFetch.map(() => null)), RDAP_BATCH_TIMEOUT_MS)
+      ),
+    ]);
+    details.forEach((d, i) => { if (d) takenToFetch[i].registration = d; });
+    const fetched = details.filter(Boolean).length;
+    console.log(`[RDAP] Got details for ${fetched}/${takenToFetch.length}${taken.length > MAX_RDAP_DETAILS ? ` (${taken.length - MAX_RDAP_DETAILS} skipped)` : ""}`);
   }
 
-  const pricesCount = list.filter((r) => r.buyLinks?.some((l) => l.priceNum != null)).length;
-  console.log(`[Pricing] ${pricesCount}/${list.length} domains have at least one price`);
+  // ─── Phase 8: Log summary ───
+  const elapsed = Date.now() - startTime;
+  const availCount = results.filter((r) => r.available).length;
+  const withPrices = results.filter((r) => (r.buyLinks?.length ?? 0) > 0).length;
+  const fromSearch = [...domainSearchHits.keys()].length;
 
-  const first = list[0];
-  if (first?.buyLinks?.length) {
-    const src = first.buyLinks.map((l) => `${l.name}=${l.price ?? "—"}`).join(", ");
-    console.log(`[Pricing] Sample (${first.domain}): ${src}`);
-  }
+  console.log(`\n[Search] ═══ COMPLETE in ${elapsed}ms ═══`);
+  console.log(`[Search] ${results.length} domains: ${availCount} available, ${results.length - availCount} taken`);
+  console.log(`[Search] ${withPrices} with pricing | ${fromSearch} from registrar searches`);
 
-  console.log("[Search] DATA SOURCES: Porkbun=live API | GoDaddy/Namecheap=API(if creds set) or static | Cloudflare/Spaceship=static at-cost | Availability=RDAP+DNS");
+  const sourceStatuses: SourceStatus[] = [
+    { name: "RDAP/DNS", status: "ok", count: rdapAvailability.size },
+    ...registrarResults.map((r) => ({
+      name: r.registrar,
+      status: (r.hits.length > 0 ? "ok" : "failed") as "ok" | "failed",
+      count: r.hits.length,
+      error: r.error,
+    })),
+  ];
 
-  return { results: list, sourceStatuses };
+  return { results, sourceStatuses };
+}
+
+/**
+ * Check RDAP/DNS availability for a batch of domains in parallel.
+ * Returns a map of domain → available.
+ */
+const RDAP_PER_DOMAIN_TIMEOUT_MS = 4000;
+
+async function checkAllAvailability(domains: string[]): Promise<Map<string, boolean>> {
+  console.log(`[RDAP] Checking availability for ${domains.length} domains...`);
+  const start = Date.now();
+
+  const results = await Promise.all(
+    domains.map(async (domain) => {
+      try {
+        const available = await Promise.race([
+          checkAvailability(domain),
+          new Promise<boolean>((_, reject) =>
+            setTimeout(() => reject(new Error("timeout")), RDAP_PER_DOMAIN_TIMEOUT_MS)
+          ),
+        ]);
+        return { domain, available };
+      } catch {
+        return { domain, available: false };
+      }
+    })
+  );
+
+  const map = new Map<string, boolean>();
+  for (const r of results) map.set(r.domain, r.available);
+
+  const availCount = [...map.values()].filter(Boolean).length;
+  console.log(`[RDAP] Done in ${Date.now() - start}ms: ${availCount} available, ${map.size - availCount} taken`);
+
+  return map;
 }
 
 export async function searchDomains(keyword: string): Promise<DomainResult[]> {

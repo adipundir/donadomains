@@ -1,63 +1,84 @@
-import type { RegistrarPriceResult, RegistrarFetchResult, RegistrarModule } from "./types";
+import type {
+  RegistrarPriceResult,
+  RegistrarFetchResult,
+  RegistrarModule,
+  RegistrarSearchResult,
+} from "./types";
 
 const NAME = "Cloudflare";
+const PRICING_URL = "https://raw.githubusercontent.com/Cloudflare-Mining/Cloudflare-Datamining/main/data/registrar/_list.json";
+const TIMEOUT_MS = 15_000;
+
+type CloudflarePricingData = Record<string, { price: number; renewal: number }>;
+
+let cache: Map<string, RegistrarPriceResult> | null = null;
+let inflightPromise: Promise<Map<string, RegistrarPriceResult> | null> | null = null;
+
+async function fetchFromApi(): Promise<Map<string, RegistrarPriceResult> | null> {
+  if (cache) return cache;
+  if (inflightPromise) return inflightPromise;
+
+  inflightPromise = (async () => {
+    const start = Date.now();
+    console.log(`[${NAME}] Fetching pricing from Cloudflare-Datamining...`);
+
+    try {
+      const res = await fetch(PRICING_URL, {
+        headers: { Accept: "application/json", "User-Agent": "donadomains/1.0" },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+
+      const elapsed = Date.now() - start;
+      if (!res.ok) {
+        console.log(`[${NAME}] ✗ HTTP ${res.status} (${elapsed}ms)`);
+        return null;
+      }
+
+      const data: CloudflarePricingData = await res.json();
+      const map = new Map<string, RegistrarPriceResult>();
+      const now = Date.now();
+
+      for (const [tld, info] of Object.entries(data)) {
+        if (typeof info?.price === "number" && info.price > 0) {
+          map.set(tld.toLowerCase(), {
+            registrar: NAME, tld: tld.toLowerCase(),
+            registration: info.price, renewal: info.renewal ?? info.price,
+            currency: "USD", source: "api", fetchedAt: now,
+          });
+        }
+      }
+
+      const samples = ["com", "net", "org", "io", "xyz"].map(t => {
+        const p = map.get(t);
+        return p ? `.${t}=$${p.registration}` : null;
+      }).filter(Boolean).join(", ");
+      console.log(`[${NAME}] ✓ ${map.size} TLDs in ${elapsed}ms — ${samples}`);
+
+      cache = map;
+      return map;
+    } catch (err) {
+      console.log(`[${NAME}] ✗ ERROR: ${(err as Error).message}`);
+      return null;
+    } finally {
+      inflightPromise = null;
+    }
+  })();
+
+  return inflightPromise;
+}
 
 /**
- * Cloudflare Registrar sells domains at wholesale (ICANN) cost with no markup.
- * They have no public pricing API — dashboard only.
- *
- * These prices come from Cloudflare's own TLD pricing page (manually verified).
- * Since they sell at cost, prices only change when ICANN/registry fees change (rare).
- * Last verified: March 2026.
- *
- * NOTE: Registration and renewal prices are the SAME at Cloudflare (at-cost model).
+ * Cloudflare has no public domain search page — only the dashboard.
+ * This returns empty hits; Cloudflare contributes only via getPrice()
+ * which is merged into buy links by the orchestrator.
  */
-const PRICES: Record<string, number> = {
-  com: 10.11,
-  net: 10.26,
-  org: 10.11,
-  io: 39.74,
-  co: 12.59,
-  dev: 12.85,
-  app: 15.85,
-  ai: 25.85,
-  xyz: 10.36,
-  me: 7.49,
-  info: 10.11,
-  biz: 10.11,
-  us: 7.49,
-  tv: 31.49,
-  online: 3.98,
-  site: 3.98,
-  tech: 5.98,
-  store: 3.98,
-  club: 5.98,
-  world: 7.98,
-  sh: 40.00,
-  uk: 7.49,
-  de: 6.49,
-  ca: 11.50,
-  au: 12.49,
-  in: 8.49,
-  jp: 12.49,
-  fr: 7.49,
-  nl: 6.49,
-  se: 14.99,
-};
+async function searchDomains(): Promise<RegistrarSearchResult> {
+  return { registrar: NAME, hits: [], fetchTimeMs: 0 };
+}
 
 function getPrice(tld: string): RegistrarPriceResult | null {
   const key = tld.replace(/^\./, "").toLowerCase();
-  const price = PRICES[key];
-  if (price == null) return null;
-  return {
-    registrar: NAME,
-    tld: key,
-    registration: price,
-    renewal: price,
-    currency: "USD",
-    source: "static",
-    fetchedAt: 0,
-  };
+  return cache?.get(key) ?? null;
 }
 
 function buildBuyUrl(domain: string): string {
@@ -65,15 +86,16 @@ function buildBuyUrl(domain: string): string {
 }
 
 async function fetchPricing(): Promise<RegistrarFetchResult> {
-  console.log(`[${NAME}] Using at-cost pricing table (${Object.keys(PRICES).length} TLDs). No public API available.`);
-  console.log(`[${NAME}]   Samples: .com=$${PRICES.com}, .net=$${PRICES.net}, .org=$${PRICES.org}, .xyz=$${PRICES.xyz}, .io=$${PRICES.io}`);
+  const start = Date.now();
+  const result = await fetchFromApi();
   return {
     registrar: NAME,
-    source: "static",
-    tldCount: Object.keys(PRICES).length,
-    fetchTimeMs: 0,
+    source: "api",
+    tldCount: result?.size ?? 0,
+    fetchTimeMs: Date.now() - start,
+    error: result ? undefined : "Failed to fetch Cloudflare pricing",
   };
 }
 
-const cloudflare: RegistrarModule = { name: NAME, fetchPricing, getPrice, buildBuyUrl };
+const cloudflare: RegistrarModule = { name: NAME, fetchPricing, getPrice, buildBuyUrl, searchDomains };
 export default cloudflare;

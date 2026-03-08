@@ -43,7 +43,7 @@ interface BuyLink {
   renewalPrice?: string;
   renewalPriceNum?: number;
   isCheapest?: boolean;
-  source?: "api" | "static";
+  source?: "api" | "scraped";
 }
 
 interface DomainResult {
@@ -105,6 +105,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchedKeyword, setSearchedKeyword] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "available" | "taken">("all");
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,6 +119,7 @@ export default function Home() {
     setError(null);
     setResults([]);
     setSearchedKeyword(keyword);
+    setFilter("all");
 
     try {
       const result = await searchDomainsAction(keyword.trim());
@@ -461,31 +463,60 @@ export default function Home() {
               )}
             </div>
           );
+          const filtered = filter === "all" ? results : results.filter((r) => filter === "available" ? r.available : !r.available);
           const searchedLower = (searchedKeyword ?? "").toLowerCase().trim();
           const userTypedTld = searchedLower.includes(".");
           const userSearchedResult = userTypedTld
-            ? results.find((r) => r.domain.toLowerCase() === searchedLower) ?? null
+            ? filtered.find((r) => r.domain.toLowerCase() === searchedLower) ?? null
             : null;
-          const restResults = results.filter((r) => r.domain !== userSearchedResult?.domain);
+          const restResults = filtered.filter((r) => r.domain !== userSearchedResult?.domain);
           const restAvailable = restResults.filter((r) => r.available);
           const restTaken = restResults.filter((r) => !r.available);
 
           return (
             <div>
-              {/* Summary bar */}
+              {/* Summary bar with filter toggles */}
               <div className="flex flex-wrap items-center justify-between gap-4 py-4 border-b border-[var(--foreground)]/20 mb-6">
                 <h2 className="font-comic-title text-xl sm:text-2xl uppercase tracking-wide text-[var(--foreground)]">
-                  {results.length} domain{results.length !== 1 ? "s" : ""} found
+                  {filtered.length} domain{filtered.length !== 1 ? "s" : ""} found
                 </h2>
                 <div className="flex gap-2 text-sm font-bold uppercase text-[var(--foreground)]">
-                  <span className="px-3 py-1.5 comic-border-thin bg-[var(--surface)]">{availableResults.length} Available</span>
-                  <span className="px-3 py-1.5 comic-border-thin bg-[var(--surface-muted)]">{takenResults.length} Taken</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilter(filter === "available" ? "all" : "available")}
+                    className={`px-3 py-1.5 comic-border-thin transition-colors ${
+                      filter === "available"
+                        ? "bg-[var(--foreground)] text-[var(--surface)]"
+                        : "bg-[var(--surface)] hover:opacity-80"
+                    }`}
+                  >
+                    {availableResults.length} Available
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilter(filter === "taken" ? "all" : "taken")}
+                    className={`px-3 py-1.5 comic-border-thin transition-colors ${
+                      filter === "taken"
+                        ? "bg-[var(--foreground)] text-[var(--surface)]"
+                        : "bg-[var(--surface-muted)] hover:opacity-80"
+                    }`}
+                  >
+                    {takenResults.length} Taken
+                  </button>
                 </div>
               </div>
 
-              {userTypedTld ? (
+              {filtered.length === 0 ? (
+                <div className="text-center p-6 comic-border bg-[var(--surface)] text-[var(--foreground)]">
+                  <p className="font-comic-title text-xl uppercase">
+                    No {filter} domains found
+                  </p>
+                  <button type="button" onClick={() => setFilter("all")} className="mt-3 font-bold underline uppercase text-sm hover:opacity-80">
+                    Show all results
+                  </button>
+                </div>
+              ) : userTypedTld ? (
                 <>
-                  {/* User typed a full domain (e.g. randomass.xyz) → show THAT first */}
                   {userSearchedResult && (
                     <div className="mb-8">
                       <h3 className="font-comic-title text-lg uppercase tracking-wide mb-4">
@@ -513,20 +544,19 @@ export default function Home() {
                 </>
               ) : (
                 <>
-                  {/* User typed just a keyword (e.g. randomass) → show taken first, then available */}
-                  {takenResults.length > 0 && (
+                  {restTaken.length > 0 && (
                     <>
                       <h3 className="font-comic-title text-lg uppercase tracking-wide mb-4">Taken</h3>
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-10">
-                        {takenResults.map((r, i) => card(r, i))}
+                        {restTaken.map((r, i) => card(r, i))}
                       </div>
                     </>
                   )}
-                  {availableResults.length > 0 && (
+                  {restAvailable.length > 0 && (
                     <>
                       <h3 className="font-comic-title text-lg uppercase tracking-wide mb-4">Available — register now</h3>
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                        {availableResults.map((r, i) => card(r, i))}
+                        {restAvailable.map((r, i) => card(r, i))}
                       </div>
                     </>
                   )}
