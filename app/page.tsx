@@ -540,7 +540,7 @@ export default function Home() {
     );
 
   return (
-    <div className={`bg-[var(--background)] text-[var(--foreground)] flex flex-col ${!hasSearched ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
+    <div className={`bg-[var(--background)] text-[var(--foreground)] flex flex-col ${!hasSearched ? 'h-[100dvh] overflow-hidden' : 'min-h-[100dvh]'}`}>
       <div className="fixed inset-0 opacity-[0.03] pointer-events-none halftone" />
 
       {/* ── Navbar ── */}
