@@ -129,24 +129,22 @@ const HOT_DOMAINS = ["coolstartup", "myportfolio.dev", "getapp.io", "brand.co", 
  * Loading stages map to the REAL server pipeline:
  *
  * Phase 1 (t=0, parallel):
- *   - checkAllAvailability()   → RDAP/DNS for ~47 domains  (~2-5s)
  *   - searchAllRegistrars()    → Firecrawl scrape 8+ sites  (~10-15s, 15s timeout)
  *
  * Phase 2 (after Phase 1, sync):
  *   - Build hits map, determine availability, merge buy links, sort  (~instant)
  *
  * Phase 3 (async):
- *   - fetchRdapDetails for up to 12 taken domains (~2-3s, 3s cap)
+ *   - fetchRdapDetails for up to 10 taken domains (~2-3s, 4s cap)
  */
 
 const PARALLEL_TASKS = [
-  { id: "rdap", label: "RDAP & DNS availability", completesAt: 4000 },
-  { id: "scrape", label: "Multi-registrar aggregation", completesAt: 13000 },
+  { id: "scrape", label: "Multi-registrar aggregation", completesAt: 10000 },
 ];
 
 const POST_TASKS = [
-  { after: 13000, label: "Merging prices & ranking" },
-  { after: 15000, label: "Fetching RDAP details for taken domains" },
+  { after: 10000, label: "Merging prices & ranking" },
+  { after: 12000, label: "Fetching RDAP details for taken domains" },
 ];
 
 function LoadingStages({ startTime }: { startTime: number }) {
@@ -338,8 +336,8 @@ export default function Home() {
     <div
       key={`${result.domain}-${index}`}
       className={`p-3 sm:p-4 md:p-5 border-2 transition-all animate-fadeInUp flex flex-col ${result.available
-          ? "border-[var(--border)] bg-[var(--surface)] shadow-[3px_3px_0px_var(--border)] hover:shadow-[1px_1px_0px_var(--border)] hover:translate-x-[2px] hover:translate-y-[2px]"
-          : "border-[var(--border-light)] bg-[var(--surface-muted)]"
+        ? "border-[var(--border)] bg-[var(--surface)] shadow-[3px_3px_0px_var(--border)] hover:shadow-[1px_1px_0px_var(--border)] hover:translate-x-[2px] hover:translate-y-[2px]"
+        : "border-[var(--border-light)] bg-[var(--surface-muted)]"
         }`}
       style={{ animationDelay: `${Math.min(index * 40, 300)}ms` }}
     >
@@ -388,8 +386,8 @@ export default function Home() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-bold transition-all ${link.isCheapest
-                    ? "bg-[var(--foreground)] text-[var(--background)] border-2 border-[var(--foreground)] shadow-[2px_2px_0px_var(--accent)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px]"
-                    : "border border-[var(--border-light)] hover:border-[var(--border)] bg-[var(--surface)]"
+                  ? "bg-[var(--foreground)] text-[var(--background)] border-2 border-[var(--foreground)] shadow-[2px_2px_0px_var(--accent)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px]"
+                  : "border border-[var(--border-light)] hover:border-[var(--border)] bg-[var(--surface)]"
                   }`}
               >
                 <span className="font-comic-title uppercase tracking-wide">{link.name}</span>
@@ -495,8 +493,8 @@ export default function Home() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold transition-all ${link.isCheapest
-                      ? "bg-[var(--foreground)] text-[var(--background)] border border-[var(--foreground)]"
-                      : "border border-[var(--border-light)] hover:border-[var(--border)]"
+                    ? "bg-[var(--foreground)] text-[var(--background)] border border-[var(--foreground)]"
+                    : "border border-[var(--border-light)] hover:border-[var(--border)]"
                     }`}
                 >
                   <span className="font-comic-title uppercase tracking-wide">{link.name}</span>
@@ -645,8 +643,8 @@ export default function Home() {
                               type="button"
                               onClick={() => setFilter(f)}
                               className={`px-2.5 py-1.5 text-xs sm:text-sm font-bold uppercase tracking-wide transition-all border whitespace-nowrap ${filter === f
-                                  ? "bg-[var(--foreground)] text-[var(--background)] border-[var(--foreground)]"
-                                  : "bg-[var(--surface)] text-[var(--foreground)] border-[var(--border-light)] hover:border-[var(--border)]"
+                                ? "bg-[var(--foreground)] text-[var(--background)] border-[var(--foreground)]"
+                                : "bg-[var(--surface)] text-[var(--foreground)] border-[var(--border-light)] hover:border-[var(--border)]"
                                 }`}
                             >
                               {label} <span className="opacity-60">{count}</span>

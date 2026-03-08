@@ -15,7 +15,7 @@ import squarespace from "./squarespace";
 
 export type { BuyLink, RegistrarSearchResult, RegistrarSearchHit } from "./types";
 
-const ALL_REGISTRARS: RegistrarModule[] = [
+export const ALL_REGISTRARS: RegistrarModule[] = [
   namecheap,
   godaddy,
   spaceship,

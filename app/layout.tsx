@@ -1,17 +1,19 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Bangers, Comic_Neue } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { Providers } from "./providers";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const bangers = Bangers({
+  weight: "400",
   subsets: ["latin"],
+  variable: "--font-bangers",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const comicNeue = Comic_Neue({
+  weight: ["400", "700"],
   subsets: ["latin"],
+  variable: "--font-comic-neue",
 });
 
 export const metadata: Metadata = {
@@ -27,7 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${bangers.variable} ${comicNeue.variable} antialiased`}
       >
         <Providers>
           {children}
