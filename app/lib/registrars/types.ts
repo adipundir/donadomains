@@ -33,6 +33,14 @@ export type PricingMap = Map<string, RegistrarPriceResult>;
 export interface RegistrarSearchHit {
   domain: string;
   available: boolean;
+  /**
+   * True only when the registrar's page explicitly said "taken", "unavailable",
+   * "registered", etc. False/absent means the domain appeared in results but
+   * without a clear taken signal (e.g. no price, unsupported TLD).
+   * This is distinct from `available: false`, which also triggers when pricing
+   * is missing — so we don't mistake "no price" for "domain is registered".
+   */
+  explicitlyTaken?: boolean;
   /** Domain is listed as premium or aftermarket (not available at standard price). */
   premium?: boolean;
   registration?: number;

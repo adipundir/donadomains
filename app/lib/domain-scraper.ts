@@ -36,7 +36,7 @@ export interface SourceStatus {
   error?: string;
 }
 
-const COMMON_TLDS = [
+export const COMMON_TLDS = [
   ".com", ".net", ".org", ".io", ".co", ".dev", ".app", ".ai",
   ".xyz", ".me", ".info", ".biz", ".us", ".tv", ".online", ".site",
   ".tech", ".store", ".club", ".world",
@@ -50,7 +50,7 @@ function tldSortKey(tld: string): number {
   return TLD_ORDER[tld] ?? 999;
 }
 
-function parseKeyword(keyword: string): { baseName: string; userTld?: string } {
+export function parseKeyword(keyword: string): { baseName: string; userTld?: string } {
   const lower = keyword.toLowerCase().trim();
   for (const tld of COMMON_TLDS) {
     if (lower.endsWith(tld)) {
@@ -60,6 +60,81 @@ function parseKeyword(keyword: string): { baseName: string; userTld?: string } {
     }
   }
   return { baseName: lower.replace(/[^a-z0-9-]/g, "") };
+}
+
+export function buildSearchResults(
+  domainSearchHits: Map<string, Map<string, RegistrarSearchHit>>,
+  baseName: string,
+  userTld?: string,
+  dnsAvailability?: Map<string, boolean>,
+): DomainResult[] {
+  const exactSet = new Set(COMMON_TLDS.map((tld) => `${baseName}${tld}`));
+  const userExactDomain = userTld ? `${baseName}${userTld}` : null;
+  const results: DomainResult[] = [];
+
+  // Union of DNS-checked domains and registrar-returned domains
+  const allDomains = new Set([
+    ...(dnsAvailability?.keys() ?? []),
+    ...domainSearchHits.keys(),
+  ]);
+
+  for (const domain of allDomains) {
+    const hits = domainSearchHits.get(domain);
+    const registrarVotes = hits ? [...hits.values()] : [];
+    const anyPremium = registrarVotes.some((h) => h.premium);
+
+    // DNS is the authoritative availability signal when present.
+    // Registrar scrapers are unreliable for availability (they mark domains
+    // "not available" when they have no pricing, not just when taken).
+    let available: boolean;
+    if (dnsAvailability?.has(domain)) {
+      available = !anyPremium && (dnsAvailability.get(domain) ?? false);
+    } else {
+      // No DNS data: fall back to registrar signal with explicitlyTaken guard
+      available = !anyPremium && registrarVotes.some((h) => h.available);
+    }
+
+    // Only include taken domains if we have real evidence:
+    // DNS confirmed it resolves, OR a registrar page explicitly said "taken/unavailable"
+    if (!available) {
+      const dnsConfirmsTaken = dnsAvailability?.has(domain) && dnsAvailability.get(domain) === false;
+      const registrarExplicitlyTaken = registrarVotes.some((h) => h.explicitlyTaken);
+      if (!dnsConfirmsTaken && !registrarExplicitlyTaken) continue;
+    }
+
+    const tld = extractTld(domain);
+    const buyLinks = available && hits ? buildMergedBuyLinks(domain, hits) : [];
+
+    results.push({
+      domain,
+      available,
+      tld,
+      source: hits ? [...hits.keys()].join(" + ") : "DNS",
+      matchType: exactSet.has(domain) ? "exact" : "similar",
+      buyLinks,
+      registerUrl: buyLinks[0]?.url,
+    });
+  }
+
+  results.sort((a, b) => {
+    if (userExactDomain) {
+      if (a.domain === userExactDomain && b.domain !== userExactDomain) return -1;
+      if (a.domain !== userExactDomain && b.domain === userExactDomain) return 1;
+    }
+    if (a.available !== b.available) return a.available ? -1 : 1;
+    if (userTld) {
+      if (a.tld === userTld && b.tld !== userTld) return -1;
+      if (a.tld !== userTld && b.tld === userTld) return 1;
+    }
+    const exactA = a.matchType === "exact" ? 0 : 1;
+    const exactB = b.matchType === "exact" ? 0 : 1;
+    if (exactA !== exactB) return exactA - exactB;
+    const tldDiff = tldSortKey(a.tld) - tldSortKey(b.tld);
+    if (tldDiff !== 0) return tldDiff;
+    return (b.buyLinks?.length ?? 0) - (a.buyLinks?.length ?? 0);
+  });
+
+  return results;
 }
 
 // ─── RDAP Bootstrap ─────────────────────────────────────────────────────────
@@ -302,24 +377,15 @@ export interface SearchDomainsMultiSourceResult {
   sourceStatuses: SourceStatus[];
 }
 
-/**
- * Main search pipeline.
- *
- * Scrape registrar search pages via Firecrawl -> each returns availability + pricing.
- * RDAP is only used at the end to fetch details for taken domains.
- */
 export async function searchDomainsMultiSource(keyword: string): Promise<SearchDomainsMultiSourceResult> {
   const startTime = Date.now();
   const { baseName, userTld } = parseKeyword(keyword);
 
   if (!baseName) return { results: [], sourceStatuses: [] };
 
-  // ─── Phase 1: Search all registrars in parallel ───
   const registrarResults = await searchAllRegistrars(baseName);
 
-  // ─── Phase 2: Build domain → registrar hits map ───
   const domainSearchHits = new Map<string, Map<string, RegistrarSearchHit>>();
-
   for (const result of registrarResults) {
     for (const hit of result.hits) {
       const d = hit.domain.toLowerCase();
@@ -328,86 +394,7 @@ export async function searchDomainsMultiSource(keyword: string): Promise<SearchD
     }
   }
 
-  // ─── Phase 3: Build unified domain list & availability ───
-  const allDomains = [...domainSearchHits.keys()];
-  const domainAvailability = new Map<string, boolean>();
-  const premiumDomains = new Set<string>();
-
-  for (const domain of allDomains) {
-    const hits = domainSearchHits.get(domain)!;
-    const registrarVotes = [...hits.values()];
-    const anyPremium = registrarVotes.some((h) => h.premium);
-
-    if (anyPremium) premiumDomains.add(domain);
-
-    if (anyPremium) {
-      domainAvailability.set(domain, false);
-      continue;
-    }
-
-    const availVotes = registrarVotes.filter((h) => h.available).length;
-    // Assume available if strictly more than half of registrars say it's available
-    domainAvailability.set(domain, availVotes > registrarVotes.length / 2);
-  }
-
-  // Generate exact matches to flag them properly
-  const exactSet = new Set(COMMON_TLDS.map((tld) => `${baseName}${tld}`));
-
-  // ─── Phase 4: Build DomainResult for each domain ───
-  const results: DomainResult[] = [];
-
-  for (const domain of allDomains) {
-    const tld = extractTld(domain);
-    const available = domainAvailability.get(domain) ?? false;
-    const isPremium = premiumDomains.has(domain);
-    const isExact = exactSet.has(domain);
-
-    const searchHits = domainSearchHits.get(domain)!;
-
-    let buyLinks = available && !isPremium ? buildMergedBuyLinks(domain, searchHits) : [];
-
-    results.push({
-      domain,
-      available,
-      tld,
-      source: [...searchHits.keys()].join(" + ") || "Registrars",
-      matchType: isExact ? "exact" : "similar",
-      buyLinks,
-      registerUrl: buyLinks[0]?.url,
-    });
-  }
-
-  // ─── Phase 5: Sort results ───
-  // Priority: available first → user's TLD → exact match → popular TLD → more buy links
-  results.sort((a, b) => {
-    if (a.available !== b.available) return a.available ? -1 : 1;
-    if (userTld) {
-      if (a.tld === userTld && b.tld !== userTld) return -1;
-      if (a.tld !== userTld && b.tld === userTld) return 1;
-    }
-    const exactA = a.matchType === "exact" ? 0 : 1;
-    const exactB = b.matchType === "exact" ? 0 : 1;
-    if (exactA !== exactB) return exactA - exactB;
-    const tldDiff = tldSortKey(a.tld) - tldSortKey(b.tld);
-    if (tldDiff !== 0) return tldDiff;
-    return (b.buyLinks?.length ?? 0) - (a.buyLinks?.length ?? 0);
-  });
-
-  // ─── Phase 6: Fetch RDAP details for taken domains ───
-  const MAX_RDAP_DETAILS = 10;
-  const RDAP_BATCH_TIMEOUT_MS = 4000;
-  const taken = results.filter((r) => !r.available);
-  const takenToFetch = taken.slice(0, MAX_RDAP_DETAILS);
-  if (takenToFetch.length > 0) {
-    const detailsPromise = Promise.all(takenToFetch.map((r) => fetchRdapDetails(r.domain)));
-    const details = await Promise.race([
-      detailsPromise,
-      new Promise<(DomainRegistrationDetails | null)[]>((resolve) =>
-        setTimeout(() => resolve(takenToFetch.map(() => null)), RDAP_BATCH_TIMEOUT_MS)
-      ),
-    ]);
-    details.forEach((d, i) => { if (d) takenToFetch[i].registration = d; });
-  }
+  const results = buildSearchResults(domainSearchHits, baseName, userTld);
 
   const sourceStatuses: SourceStatus[] = registrarResults.map((r) => ({
     name: r.registrar,
@@ -416,8 +403,7 @@ export async function searchDomainsMultiSource(keyword: string): Promise<SearchD
     error: r.error,
   }));
 
-  const elapsed = Date.now() - startTime;
-  console.log(`[Search] Found ${results.length} domains in ${elapsed}ms`);
+  console.log(`[Search] Found ${results.length} domains in ${Date.now() - startTime}ms`);
 
   return { results, sourceStatuses };
 }

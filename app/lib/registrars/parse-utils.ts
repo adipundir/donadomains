@@ -118,6 +118,7 @@ export function parseSearchMarkdown(
 
       if (existing) {
         if (markedPremium) existing.premium = true;
+        if (isTaken) existing.explicitlyTaken = true;
         if (isTaken || markedPremium) existing.available = false;
 
         const prevIsYearly = hitPriceIsYearly.get(domain) ?? false;
@@ -136,6 +137,7 @@ export function parseSearchMarkdown(
         hitMap.set(domain, {
           domain,
           available: !isTaken && !markedPremium && price != null,
+          explicitlyTaken: isTaken || undefined,
           premium: markedPremium || undefined,
           registration: price,
           renewal,

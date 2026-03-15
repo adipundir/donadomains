@@ -1,0 +1,1 @@
+CREATE INDEX "tokens_expires_at_idx" ON "watch_tokens" USING btree ("expires_at");
