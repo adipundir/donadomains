@@ -94,16 +94,21 @@ export function buildSearchResults(
       available = !anyPremium && registrarVotes.some((h) => h.available);
     }
 
-    // Only include taken domains if we have real evidence:
-    // DNS confirmed it resolves, OR a registrar page explicitly said "taken/unavailable"
+    // Only include taken domains if DNS confirmed it (the domain we actually checked).
+    // Registrar "similar" suggestions that are taken (e.g. google.com, facebook.com)
+    // are noise — skip them unless DNS specifically checked that domain.
     if (!available) {
       const dnsConfirmsTaken = dnsAvailability?.has(domain) && dnsAvailability.get(domain) === false;
-      const registrarExplicitlyTaken = registrarVotes.some((h) => h.explicitlyTaken);
-      if (!dnsConfirmsTaken && !registrarExplicitlyTaken) continue;
+      if (!dnsConfirmsTaken) continue;
     }
 
     const tld = extractTld(domain);
     const buyLinks = available && hits ? buildMergedBuyLinks(domain, hits) : [];
+
+    // Don't show available domains with no pricing yet — they'll appear
+    // once a registrar responds with buy links. Avoids empty cards during
+    // the DNS-only phase.
+    if (available && buyLinks.length === 0) continue;
 
     results.push({
       domain,
