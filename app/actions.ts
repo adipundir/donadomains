@@ -40,9 +40,9 @@ export async function fetchDomainIntelAction(domain: string): Promise<DomainInte
   }
 }
 
-// ─── Domain Watch Actions ────────────────────────────────────────────────────
+// ─── Domain Notification Actions ─────────────────────────────────────────────
 
-export interface WatchResult {
+export interface ActionResult {
   success: boolean;
   error?: string;
 }
@@ -50,10 +50,10 @@ export interface WatchResult {
 const DOMAIN_RE = /^[a-z0-9][a-z0-9.-]*[a-z0-9]\.[a-z]{2,}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export async function watchDomainAction(
+export async function notifyDomainAction(
   email: string,
   domain: string,
-): Promise<WatchResult> {
+): Promise<ActionResult> {
   const d = domain.trim().toLowerCase();
   const e = email.trim().toLowerCase();
 
@@ -61,9 +61,8 @@ export async function watchDomainAction(
   if (!DOMAIN_RE.test(d)) return { success: false, error: "Invalid domain name" };
 
   try {
-    // Check DB + email are configured
     if (!process.env.DATABASE_URL) {
-      return { success: false, error: "Domain watch is not configured yet" };
+      return { success: false, error: "Notifications are not configured yet" };
     }
     if (!process.env.BREVO_API_KEY) {
       return { success: false, error: "Email service is not configured yet" };
@@ -91,15 +90,14 @@ export async function watchDomainAction(
 
     return { success: true };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Failed to create watch";
-    // "already watching" is not an error from the user's perspective
-    if (msg.includes("already watching")) return { success: false, error: msg };
-    console.error("[Watch] create failed:", err);
+    const msg = err instanceof Error ? err.message : "Failed to set up notification";
+    if (msg.includes("already")) return { success: false, error: msg };
+    console.error("[Notify] create failed:", err);
     return { success: false, error: msg };
   }
 }
 
-export async function verifyWatchAction(token: string): Promise<WatchResult & { domain?: string }> {
+export async function verifyNotificationAction(token: string): Promise<ActionResult & { domain?: string }> {
   if (!token) return { success: false, error: "Missing verification token" };
 
   try {
@@ -107,12 +105,12 @@ export async function verifyWatchAction(token: string): Promise<WatchResult & { 
     if (!watch) return { success: false, error: "Invalid or expired verification link" };
     return { success: true, domain: watch.domain };
   } catch (err) {
-    console.error("[Watch] verify failed:", err);
+    console.error("[Notify] verify failed:", err);
     return { success: false, error: "Verification failed" };
   }
 }
 
-export async function unwatchDomainAction(token: string): Promise<WatchResult> {
+export async function unsubscribeAction(token: string): Promise<ActionResult> {
   if (!token) return { success: false, error: "Missing unsubscribe token" };
 
   try {
@@ -120,12 +118,12 @@ export async function unwatchDomainAction(token: string): Promise<WatchResult> {
     if (!ok) return { success: false, error: "Invalid or expired unsubscribe link" };
     return { success: true };
   } catch (err) {
-    console.error("[Watch] unsubscribe failed:", err);
-    return { success: false, error: "Failed to remove watch" };
+    console.error("[Notify] unsubscribe failed:", err);
+    return { success: false, error: "Failed to unsubscribe" };
   }
 }
 
-export async function getWatchesAction(email: string): Promise<{ success: boolean; watches: DomainWatch[]; error?: string }> {
+export async function getNotificationsAction(email: string): Promise<{ success: boolean; watches: DomainWatch[]; error?: string }> {
   const e = email.trim().toLowerCase();
   if (!EMAIL_RE.test(e)) return { success: false, watches: [], error: "Invalid email" };
 
@@ -133,7 +131,7 @@ export async function getWatchesAction(email: string): Promise<{ success: boolea
     const watches = await getWatchesByEmail(e);
     return { success: true, watches };
   } catch (err) {
-    console.error("[Watch] list failed:", err);
-    return { success: false, watches: [], error: "Failed to fetch watches" };
+    console.error("[Notify] list failed:", err);
+    return { success: false, watches: [], error: "Failed to fetch notifications" };
   }
 }

@@ -1,9 +1,9 @@
 /**
- * Rate limiting for watch creation — Postgres-backed.
+ * Rate limiting for notification creation — Postgres-backed.
  *
- *   - Per IP: max 5 watches per hour
- *   - Per email: max 10 total active watches
- *   - Per domain: max 50 total watchers
+ *   - Per IP: max 5 notifications per hour
+ *   - Per email: max 10 total active notifications
+ *   - Per domain: max 50 total subscribers
  *
  * The IP limit uses a single atomic INSERT ... ON CONFLICT DO UPDATE to avoid
  * the read-then-write race condition that would let concurrent requests bypass
@@ -64,13 +64,13 @@ export async function checkRateLimit(
   // Email limit — total active watches
   const emailCount = await countWatchesByEmail(email);
   if (emailCount >= MAX_WATCHES_PER_EMAIL) {
-    return { ok: false, error: `Maximum ${MAX_WATCHES_PER_EMAIL} watches per email.` };
+    return { ok: false, error: `Maximum ${MAX_WATCHES_PER_EMAIL} notifications per email.` };
   }
 
   // Domain limit — total watchers
   const domainCount = await countWatchersByDomain(domain);
   if (domainCount >= MAX_WATCHERS_PER_DOMAIN) {
-    return { ok: false, error: "Too many people watching this domain." };
+    return { ok: false, error: "Too many people are monitoring this domain." };
   }
 
   return { ok: true };

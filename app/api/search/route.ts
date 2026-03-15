@@ -68,6 +68,8 @@ export async function GET(req: NextRequest) {
       // ── Phase 1A: DNS checks for all common TLDs ─────────────────────────
       // Fast (~200ms), runs in parallel with registrar scrapes.
       // NXDOMAIN = available. Resolves = taken.
+      // As soon as DNS finishes, kick off RDAP for taken domains immediately
+      // (don't wait for registrar scrapes).
       const dnsPhase = (async () => {
         const candidates = COMMON_TLDS.map((tld) => `${baseName}${tld}`);
         const t0 = Date.now();
@@ -104,6 +106,33 @@ export async function GET(req: NextRequest) {
           results: buildSearchResults(domainPricingHits, baseName, userTld, dnsAvailability),
           sourceStatuses: [...sourceStatuses],
         });
+
+        // Start RDAP immediately for taken domains — don't wait for registrar scrapes
+        const takenDomains = [...dnsAvailability.entries()]
+          .filter(([, avail]) => !avail)
+          .map(([domain]) => domain)
+          .slice(0, MAX_RDAP_TAKEN);
+
+        if (takenDomains.length > 0) {
+          console.log(`[Search] RDAP: fetching details for ${takenDomains.length} taken domains`);
+          await Promise.all(
+            takenDomains.map(async (domain) => {
+              try {
+                const rdap = await Promise.race([
+                  fetchRdapDetails(domain),
+                  new Promise<null>((resolve) =>
+                    setTimeout(() => resolve(null), RDAP_TIMEOUT_MS)
+                  ),
+                ]);
+                if (rdap) {
+                  console.log(`[Search] RDAP: ${domain} — ${rdap.registrar ?? "unknown registrar"}`);
+                  write({ type: "rdap_update", domain, registration: rdap });
+                }
+              } catch {}
+            })
+          );
+        }
+        write({ type: "rdap_done" });
       })();
 
       // ── Phase 1B: Registrar scrapes for PRICING ───────────────────────────
@@ -140,36 +169,9 @@ export async function GET(req: NextRequest) {
         });
       });
 
-      // ── Phase 2: RDAP for taken domains ──────────────────────────────────
-      // After DNS + all registrar scrapes finish, fetch registration details
-      // for taken domains so the UI can show registrar, expiry, owner etc.
+      // Wait for all phases then close stream
       Promise.all([dnsPhase, ...registrarPhases])
-        .then(async () => {
-          const takenDomains = [...dnsAvailability.entries()]
-            .filter(([, available]) => !available)
-            .map(([domain]) => domain)
-            .slice(0, MAX_RDAP_TAKEN);
-
-          if (takenDomains.length > 0) {
-            console.log(`[Search] RDAP: fetching details for ${takenDomains.length} taken domains`);
-            await Promise.all(
-              takenDomains.map(async (domain) => {
-                try {
-                  const rdap = await Promise.race([
-                    fetchRdapDetails(domain),
-                    new Promise<null>((resolve) =>
-                      setTimeout(() => resolve(null), RDAP_TIMEOUT_MS)
-                    ),
-                  ]);
-                  if (rdap) {
-                    console.log(`[Search] RDAP: ${domain} — ${rdap.registrar ?? "unknown registrar"}`);
-                    write({ type: "rdap_update", domain, registration: rdap });
-                  }
-                } catch {}
-              })
-            );
-          }
-
+        .then(() => {
           console.log(`[Search] Complete.`);
           write({ type: "complete" });
           try { controller.close(); } catch {}

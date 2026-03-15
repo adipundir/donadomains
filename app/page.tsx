@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "next-themes";
-import { fetchDomainIntelAction, watchDomainAction } from "./actions";
+import { fetchDomainIntelAction, notifyDomainAction } from "./actions";
 import type { DomainIntel, DomainResult, DomainRegistrationDetails, BuyLink } from "./types";
 
 function ThemeSwitcher() {
@@ -34,6 +34,16 @@ function formatDate(iso?: string): string {
     return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   } catch {
     return iso;
+  }
+}
+
+function daysUntil(iso?: string): number | null {
+  if (!iso) return null;
+  try {
+    const diff = new Date(iso).getTime() - Date.now();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  } catch {
+    return null;
   }
 }
 
@@ -91,19 +101,19 @@ const HOT_DOMAINS = ["coolstartup", "myportfolio.dev", "getapp.io", "brand.co", 
 
 /* ── Domain Intel Panel (slide-over) ── */
 /* ── Watch Form (inside intel panel) ── */
-function WatchForm({ domain }: { domain: string }) {
+function NotifyForm({ domain }: { domain: string }) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
 
-  const handleWatch = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
     setStatus("loading");
-    const result = await watchDomainAction(email.trim(), domain);
+    const result = await notifyDomainAction(email.trim(), domain);
     if (result.success) {
       setStatus("success");
-      setMessage("Check your email to verify and start watching.");
+      setMessage("Check your email to verify and activate notifications.");
     } else {
       setStatus("error");
       setMessage(result.error || "Something went wrong");
@@ -112,9 +122,9 @@ function WatchForm({ domain }: { domain: string }) {
 
   return (
     <div className="mt-5 pt-5 border-t border-[var(--border-light)]">
-      <p className="font-comic-title text-[10px] uppercase tracking-widest opacity-50 mb-2">Watch this domain</p>
-      <p className="font-comic-body text-xs opacity-60 mb-3">
-        Get notified when this domain becomes available.
+      <p className="font-comic-title text-xs uppercase tracking-widest mb-2">Notify when available</p>
+      <p className="font-comic-body text-sm opacity-70 mb-3">
+        Get an email when this domain becomes available to register.
       </p>
 
       {status === "success" ? (
@@ -125,7 +135,7 @@ function WatchForm({ domain }: { domain: string }) {
           <span className="font-comic-body text-xs font-bold">{message}</span>
         </div>
       ) : (
-        <form onSubmit={handleWatch} className="flex gap-2">
+        <form onSubmit={handleSubmit} className="flex gap-2">
           <input
             type="email"
             required
@@ -140,7 +150,7 @@ function WatchForm({ domain }: { domain: string }) {
             disabled={status === "loading"}
             className="font-comic-title px-4 py-2 text-xs uppercase tracking-wide border-2 border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)] hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            {status === "loading" ? "..." : "Watch"}
+            {status === "loading" ? "..." : "Notify Me"}
           </button>
         </form>
       )}
@@ -184,9 +194,9 @@ function DomainIntelPanel({ domain, onClose }: { domain: string; onClose: () => 
   const intelRow = (label: string, value?: string | null) => {
     if (!value) return null;
     return (
-      <div className="flex flex-col gap-0.5 py-2 border-b border-[var(--border-light)]">
+      <div className="flex flex-col gap-1 py-3 border-b border-[var(--border-light)]">
         <span className="font-comic-title text-[10px] uppercase tracking-widest opacity-50">{label}</span>
-        <span className="font-comic-body text-sm font-bold break-all">{value}</span>
+        <span className="font-comic-body text-[15px] font-bold break-all">{value}</span>
       </div>
     );
   };
@@ -201,8 +211,23 @@ function DomainIntelPanel({ domain, onClose }: { domain: string; onClose: () => 
         {/* Header */}
         <div className="sticky top-0 z-10 bg-[var(--background)] border-b-2 border-[var(--border)] px-5 py-4 flex items-center justify-between">
           <div>
-            <p className="font-comic-title text-lg uppercase tracking-wide">{domain}</p>
-            <p className="font-comic-body text-xs opacity-50">Domain Intelligence</p>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <p className="font-comic-title text-lg uppercase tracking-wide">{domain}</p>
+              {!loading && intel && (
+                intel.registered ? (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border border-[var(--border)] opacity-70">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                    Registered
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--green)] border border-[var(--green)]">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--green)]" />
+                    Available
+                  </span>
+                )
+              )}
+            </div>
+            <p className="font-comic-body text-xs opacity-70">Domain Intelligence</p>
           </div>
           <button
             type="button"
@@ -216,140 +241,148 @@ function DomainIntelPanel({ domain, onClose }: { domain: string; onClose: () => 
 
         <div className="px-5 py-4">
           {loading && (
-            <div className="flex flex-col items-center gap-4 py-12">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent)] loading-stage-pulse" />
-                <span className="font-comic-body text-sm font-bold opacity-50">Gathering intelligence...</span>
+            <div className="flex flex-col items-center gap-3 py-16">
+              <div className="flex items-center gap-2.5">
+                <span className="w-3 h-3 rounded-full bg-[var(--accent)] loading-stage-pulse" />
+                <span className="font-comic-title text-base uppercase tracking-wide">Gathering intelligence</span>
               </div>
-              <p className="font-comic-body text-xs opacity-30">Checking RDAP, WHOIS & more</p>
+              <p className="font-comic-body text-sm opacity-60">Checking RDAP, DNS & WHOIS records</p>
             </div>
           )}
 
           {error && (
-            <div className="text-center py-12">
-              <p className="font-comic-title text-lg uppercase opacity-50">Error</p>
-              <p className="font-comic-body text-sm mt-1 opacity-70">{error}</p>
+            <div className="text-center py-16">
+              <p className="font-comic-title text-xl uppercase">Something went wrong</p>
+              <p className="font-comic-body text-sm mt-2 opacity-70">{error}</p>
             </div>
           )}
 
           {!loading && intel && (
-            <div>
-              {/* Registration status badge */}
-              <div className="mb-4">
-                {intel.registered ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold uppercase tracking-wide border border-[var(--foreground)]/20">
-                    <span className="w-2 h-2 rounded-full bg-red-400" />
-                    Registered
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-[var(--green)] border border-[var(--green)]/30">
-                    <span className="w-2 h-2 rounded-full bg-[var(--green)]" />
-                    Available
-                  </span>
-                )}
-              </div>
-
+            <div className="space-y-5">
               {!intel.registered && (
-                <p className="font-comic-body text-sm opacity-60 py-4">
+                <p className="font-comic-body text-sm">
                   This domain is not currently registered and may be available for purchase.
                 </p>
               )}
 
               {intel.registered && (
                 <>
-                  {/* Owner / Organization */}
+                  {/* ── Owner Section ── */}
                   {(intel.registrant || intel.organization) && (
-                    <div className="mb-4 p-3 border border-[var(--border-light)] bg-[var(--surface)]">
-                      <p className="font-comic-title text-[10px] uppercase tracking-widest opacity-50 mb-1">Owner</p>
+                    <div className="p-4 border-2 border-[var(--border-light)] bg-[var(--surface)]">
+                      <p className="font-comic-title text-xs uppercase tracking-widest mb-1.5">Owner</p>
                       {intel.registrant && <p className="font-comic-body text-base font-bold">{intel.registrant}</p>}
                       {intel.organization && intel.organization !== intel.registrant && (
-                        <p className="font-comic-body text-sm opacity-70">{intel.organization}</p>
+                        <p className="font-comic-body text-sm opacity-80 mt-0.5">{intel.organization}</p>
                       )}
                     </div>
                   )}
 
-                  {/* Dates */}
-                  <div className="grid grid-cols-3 gap-2 mb-4">
-                    {[
-                      { label: "Created", value: intel.created },
-                      { label: "Updated", value: intel.updated },
-                      { label: "Expires", value: intel.expires },
-                    ].map(({ label, value }) => (
-                      <div key={label} className="p-2 border border-[var(--border-light)] bg-[var(--surface)] text-center">
-                        <p className="font-comic-title text-[10px] uppercase tracking-widest opacity-50">{label}</p>
-                        <p className="font-comic-body text-xs font-bold mt-0.5">
-                          {value ? formatDate(value) : "—"}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* All fields */}
+                  {/* ── Key Dates ── */}
                   <div>
-                    {intelRow("Registrar", intel.registrar)}
-                    {intelRow("Registrar URL", intel.registrarUrl)}
-                    {intelRow("Email", intel.contactEmail)}
-                    {intelRow("Phone", intel.contactPhone)}
-                    {intelRow("Address", intel.contactAddress)}
-                    {intelRow("DNSSEC", intel.dnssec)}
-
-                    {intel.nameservers && intel.nameservers.length > 0 && (
-                      <div className="flex flex-col gap-0.5 py-2 border-b border-[var(--border-light)]">
-                        <span className="font-comic-title text-[10px] uppercase tracking-widest opacity-50">Nameservers</span>
-                        <div className="flex flex-wrap gap-1 mt-0.5">
-                          {intel.nameservers.map((ns) => (
-                            <span key={ns} className="font-comic-body text-xs font-bold px-1.5 py-0.5 border border-[var(--border-light)] bg-[var(--surface)]">
-                              {ns}
-                            </span>
-                          ))}
+                    <p className="font-comic-title text-xs uppercase tracking-widest mb-2.5">Key Dates</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { label: "Created", value: intel.created },
+                        { label: "Updated", value: intel.updated },
+                        { label: "Expires", value: intel.expires },
+                      ].map(({ label, value }) => (
+                        <div key={label} className="p-3 border-2 border-[var(--border-light)] bg-[var(--surface)] text-center">
+                          <p className="font-comic-title text-[10px] uppercase tracking-widest opacity-50">{label}</p>
+                          <p className="font-comic-body text-[13px] font-bold mt-1">
+                            {value ? formatDate(value) : "—"}
+                          </p>
                         </div>
-                      </div>
-                    )}
-
-                    {intel.status && intel.status.length > 0 && (
-                      <div className="flex flex-col gap-0.5 py-2 border-b border-[var(--border-light)]">
-                        <span className="font-comic-title text-[10px] uppercase tracking-widest opacity-50">Status</span>
-                        <div className="flex flex-wrap gap-1 mt-0.5">
-                          {intel.status.map((s) => (
-                            <span key={s} className="font-comic-body text-[11px] font-bold px-1.5 py-0.5 border border-[var(--border-light)] bg-[var(--surface)]">
-                              {STATUS_LABELS[s] || s}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                      ))}
+                    </div>
                   </div>
 
-                  {/* Contact actions */}
-                  {(intel.contactEmail || intel.contactPhone) && (
-                    <div className="mt-5 flex gap-2">
-                      {intel.contactEmail && (
-                        <a
-                          href={`mailto:${intel.contactEmail}`}
-                          className="flex-1 font-comic-title text-center px-4 py-2.5 text-sm uppercase tracking-wide border-2 border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)] shadow-[3px_3px_0px_var(--border)] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all"
-                        >
-                          Email Owner
-                        </a>
-                      )}
-                      {intel.contactPhone && (
-                        <a
-                          href={`tel:${intel.contactPhone.replace(/\D/g, "")}`}
-                          className="flex-1 font-comic-title text-center px-4 py-2.5 text-sm uppercase tracking-wide border-2 border-[var(--border)] bg-[var(--surface)] shadow-[3px_3px_0px_var(--border)] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all"
-                        >
-                          Call
-                        </a>
-                      )}
+                  {/* ── Registration Details ── */}
+                  {(intel.registrar || intel.registrarUrl) && (
+                    <div>
+                      <p className="font-comic-title text-xs uppercase tracking-widest mb-2.5">Registration</p>
+                      <div className="space-y-0.5">
+                        {intelRow("Registrar", intel.registrar)}
+                        {intelRow("Registrar URL", intel.registrarUrl)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Contact Info ── */}
+                  {(intel.contactEmail || intel.contactPhone || intel.contactAddress) && (
+                    <div>
+                      <p className="font-comic-title text-xs uppercase tracking-widest mb-2.5">Contact</p>
+                      <div className="space-y-0.5">
+                        {intelRow("Email", intel.contactEmail)}
+                        {intelRow("Phone", intel.contactPhone)}
+                        {intelRow("Address", intel.contactAddress)}
+                      </div>
+                      {/* Contact action buttons */}
+                      <div className="mt-3 flex gap-2">
+                        {intel.contactEmail && (
+                          <a
+                            href={`mailto:${intel.contactEmail}`}
+                            className="flex-1 font-comic-title text-center px-4 py-2.5 text-sm uppercase tracking-wide border-2 border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)] shadow-[3px_3px_0px_var(--border)] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all"
+                          >
+                            Email Owner
+                          </a>
+                        )}
+                        {intel.contactPhone && (
+                          <a
+                            href={`tel:${intel.contactPhone.replace(/\D/g, "")}`}
+                            className="flex-1 font-comic-title text-center px-4 py-2.5 text-sm uppercase tracking-wide border-2 border-[var(--border)] bg-[var(--surface)] shadow-[3px_3px_0px_var(--border)] hover:shadow-none hover:translate-x-[3px] hover:translate-y-[3px] transition-all"
+                          >
+                            Call
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Technical Details ── */}
+                  {(intel.dnssec || (intel.nameservers && intel.nameservers.length > 0) || (intel.status && intel.status.length > 0)) && (
+                    <div>
+                      <p className="font-comic-title text-xs uppercase tracking-widest mb-2.5">Technical</p>
+                      <div className="space-y-0.5">
+                        {intelRow("DNSSEC", intel.dnssec)}
+
+                        {intel.nameservers && intel.nameservers.length > 0 && (
+                          <div className="flex flex-col gap-1 py-2.5 border-b border-[var(--border-light)]">
+                            <span className="font-comic-title text-[10px] uppercase tracking-widest opacity-50">Nameservers</span>
+                            <div className="flex flex-wrap gap-1.5 mt-0.5">
+                              {intel.nameservers.map((ns) => (
+                                <span key={ns} className="font-comic-body text-xs font-bold px-2 py-1 border border-[var(--border-light)] bg-[var(--surface)]">
+                                  {ns}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {intel.status && intel.status.length > 0 && (
+                          <div className="flex flex-col gap-1 py-2.5 border-b border-[var(--border-light)]">
+                            <span className="font-comic-title text-[10px] uppercase tracking-widest opacity-50">Status</span>
+                            <div className="flex flex-wrap gap-1.5 mt-0.5">
+                              {intel.status.map((s) => (
+                                <span key={s} className="font-comic-body text-xs font-bold px-2 py-1 border border-[var(--border-light)] bg-[var(--surface)]">
+                                  {STATUS_LABELS[s] || s}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </>
               )}
 
               {/* Watch form */}
-              {intel.registered && <WatchForm domain={intel.domain} />}
+              {intel.registered && <NotifyForm domain={intel.domain} />}
 
               {/* Sources footer */}
-              <div className="mt-6 pt-4 border-t border-[var(--border-light)]">
-                <p className="font-comic-body text-[10px] uppercase tracking-widest opacity-30">
+              <div className="pt-4 border-t border-[var(--border-light)]">
+                <p className="font-comic-body text-[11px] uppercase tracking-widest opacity-60">
                   Sources: {intel.sources.join(" → ")}
                   {Object.keys(intel.timing).length > 0 && (
                     <span className="ml-2">
@@ -427,6 +460,7 @@ export default function Home() {
   const [keyword, setKeyword] = useState("");
   const [results, setResults] = useState<DomainResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [rdapDone, setRdapDone] = useState(false);
   const [loadingStart, setLoadingStart] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [searchedKeyword, setSearchedKeyword] = useState<string | null>(null);
@@ -457,6 +491,7 @@ export default function Home() {
     searchAbortRef.current = abort;
 
     setLoading(true);
+    setRdapDone(false);
     setLoadingStart(Date.now());
     setError(null);
     setResults([]);
@@ -515,6 +550,8 @@ export default function Home() {
           } else if (event.type === "complete") {
             console.log("[Search] Complete event received, stopping loading");
             setLoading(false);
+          } else if (event.type === "rdap_done") {
+            setRdapDone(true);
           } else if (event.type === "rdap_update" && event.domain && event.registration) {
             setResults((prev) =>
               prev.map((r) =>
@@ -593,18 +630,16 @@ export default function Home() {
                 Available
               </span>
             ) : (
-              <span className="shrink-0 px-2 py-0.5 text-[11px] font-bold uppercase text-[var(--foreground)]/40 tracking-wide">
+              <span className="shrink-0 px-2 py-0.5 text-[11px] font-bold uppercase opacity-60 tracking-wide">
                 Taken
               </span>
             )}
           </div>
-          <p className="text-xs font-bold opacity-50 mt-1 flex flex-wrap items-center gap-1.5">
-            <span>{result.tld}</span>
-            {result.matchType === "similar" && (
-              <span className="px-1 py-px border border-[var(--border-light)] text-[10px] uppercase">similar</span>
-            )}
-            {result.source && <span className="opacity-60">· {result.source}</span>}
-          </p>
+          {result.matchType === "similar" && (
+            <p className="text-xs font-bold opacity-60 mt-1">
+              <span className="px-1.5 py-0.5 border border-[var(--border-light)] text-[10px] uppercase">similar</span>
+            </p>
+          )}
         </div>
 
         {!result.available && (
@@ -613,13 +648,13 @@ export default function Home() {
             onClick={() => setIntelDomain(result.domain)}
             className="shrink-0 font-comic-title px-3 py-1.5 text-xs uppercase border-2 border-[var(--border)] tracking-wide bg-[var(--surface)] hover:bg-[var(--foreground)] hover:text-[var(--surface)] transition-colors whitespace-nowrap"
           >
-            Details
+            More Details
           </button>
         )}
       </div>
 
       {/* Buy links for available domains */}
-      {result.available && result.buyLinks && result.buyLinks.length > 0 && (
+      {result.available && result.buyLinks && result.buyLinks.length > 0 ? (
         <div className="mt-3 sm:mt-4 pt-3 border-t border-[var(--border-light)]">
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
             {result.buyLinks.map((link) => (
@@ -634,43 +669,55 @@ export default function Home() {
                   }`}
               >
                 <span className="font-comic-title uppercase tracking-wide">{link.name}</span>
-                {link.price && <span className={link.isCheapest ? "font-comic-title" : "opacity-70"}>{link.price}</span>}
+                {link.price && <span className={link.isCheapest ? "font-comic-title" : ""}>{link.price}</span>}
                 {link.isCheapest && <StarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[var(--accent)]" />}
               </a>
             ))}
           </div>
         </div>
-      )}
+      ) : result.available && loading ? (
+        <div className="mt-3 sm:mt-4 pt-3 border-t border-[var(--border-light)]">
+          <p className="font-comic-title text-xs uppercase tracking-widest opacity-60 loading-ellipsis">Comparing prices</p>
+        </div>
+      ) : result.available && (!result.buyLinks || result.buyLinks.length === 0) ? (
+        <div className="mt-3 sm:mt-4 pt-3 border-t border-[var(--border-light)]">
+          <p className="font-comic-body text-sm opacity-60">No registrar pricing found — search directly on registrar sites to purchase.</p>
+        </div>
+      ) : null}
 
-      {/* RDAP info for taken domains */}
+      {/* RDAP info for taken domains — single row */}
       {!result.available && (
-        <div className="mt-3 pt-3 border-t border-[var(--border-light)] text-xs opacity-80 space-y-1.5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-            <p><span className="font-bold uppercase opacity-60">Registrar:</span> {result.registration?.registrar ?? "—"}</p>
-            <p><span className="font-bold uppercase opacity-60">Registered:</span> {formatDate(result.registration?.created)}</p>
-            <p><span className="font-bold uppercase opacity-60">Expires:</span> {formatDate(result.registration?.expires)}</p>
-            {result.registration?.registrant && (
-              <p><span className="font-bold uppercase opacity-60">Owner:</span> {result.registration.registrant}</p>
-            )}
-          </div>
-          {(result.registration?.contactEmail || result.registration?.contactPhone || result.registration?.contactAddress) && (
-            <div className="pt-1 space-y-0.5">
-              {result.registration.contactEmail && (
-                <p><span className="font-bold uppercase opacity-60">Email:</span> <a href={`mailto:${result.registration.contactEmail}`} className="underline hover:no-underline break-all">{result.registration.contactEmail}</a></p>
+        <div className="mt-3 pt-3 border-t border-[var(--border-light)]">
+          {result.registration?.registrar || result.registration?.expires || result.registration?.created || result.registration?.registrant ? (
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+              {result.registration?.registrar && (
+                <p><span className="font-comic-title text-xs uppercase tracking-wide opacity-60 mr-1.5">Registrar</span><span className="text-sm font-bold">{result.registration.registrar}</span></p>
               )}
-              {result.registration.contactPhone && (
-                <p><span className="font-bold uppercase opacity-60">Phone:</span> <a href={`tel:${result.registration.contactPhone.replace(/\D/g, "")}`} className="underline hover:no-underline">{result.registration.contactPhone}</a></p>
+              {result.registration?.registrant && (
+                <p className="max-w-[220px] truncate"><span className="font-comic-title text-xs uppercase tracking-wide opacity-60 mr-1.5">Owner</span><span className="text-sm font-bold" title={result.registration.registrant}>{result.registration.registrant}</span></p>
               )}
-              {result.registration.contactAddress && (
-                <p><span className="font-bold uppercase opacity-60">Address:</span> <span className="break-words">{result.registration.contactAddress}</span></p>
+              {result.registration?.created && (
+                <p><span className="font-comic-title text-xs uppercase tracking-wide opacity-60 mr-1.5">Registered</span><span className="text-sm font-bold">{formatDate(result.registration.created)}</span></p>
               )}
+              {result.registration?.expires && (() => {
+                const days = daysUntil(result.registration.expires);
+                return (
+                  <p>
+                    <span className="font-comic-title text-xs uppercase tracking-wide opacity-60 mr-1.5">Expires</span>
+                    <span className="text-sm font-bold">{formatDate(result.registration.expires)}</span>
+                    {days !== null && (
+                      <span className={`ml-1.5 text-xs font-bold ${days <= 30 ? "text-red-500" : days <= 90 ? "text-orange-500" : "opacity-60"}`}>
+                        ({days <= 0 ? "expired" : `${days}d left`})
+                      </span>
+                    )}
+                  </p>
+                );
+              })()}
             </div>
-          )}
-          {result.registration?.status && result.registration.status.length > 0 && (
-            <p className="pt-0.5">
-              <span className="font-bold uppercase opacity-60">Status:</span>{" "}
-              {formatStatus(result.registration.status)}
-            </p>
+          ) : !rdapDone ? (
+            <p className="font-comic-title text-xs uppercase tracking-widest opacity-60 loading-ellipsis">Fetching details</p>
+          ) : (
+            <p className="font-comic-body text-sm opacity-60">Registration details unavailable — often privacy protected</p>
           )}
         </div>
       )}
@@ -749,13 +796,15 @@ export default function Home() {
                 <span className="text-[10px] font-bold opacity-40">+{result.buyLinks.length - 3}</span>
               )}
             </>
+          ) : result.available && loading ? (
+            <span className="font-comic-title text-[10px] uppercase tracking-widest opacity-40 loading-ellipsis">Comparing</span>
           ) : !result.available ? (
             <button
               type="button"
               onClick={() => setIntelDomain(result.domain)}
               className="font-comic-title px-2.5 py-1 text-xs uppercase border border-[var(--border-light)] hover:border-[var(--border)] tracking-wide transition-colors"
             >
-              Details
+              More Details
             </button>
           ) : null}
         </div>

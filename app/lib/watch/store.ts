@@ -42,7 +42,7 @@ export async function createWatch(
     .where(and(eq(domainWatches.email, e), eq(domainWatches.domain, d)));
 
   if (existing.length > 0) {
-    throw new Error("You are already watching this domain");
+    throw new Error("You already have notifications set up for this domain");
   }
 
   // Insert watch

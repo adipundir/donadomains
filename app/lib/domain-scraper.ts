@@ -105,10 +105,10 @@ export function buildSearchResults(
     const tld = extractTld(domain);
     const buyLinks = available && hits ? buildMergedBuyLinks(domain, hits) : [];
 
-    // Don't show available domains with no pricing yet — they'll appear
-    // once a registrar responds with buy links. Avoids empty cards during
-    // the DNS-only phase.
-    if (available && buyLinks.length === 0) continue;
+    // Hide available domains with no pricing unless it's the user's exact query.
+    // This avoids empty cards during the DNS-only phase while still showing
+    // the specific domain the user searched for.
+    if (available && buyLinks.length === 0 && domain !== userExactDomain) continue;
 
     results.push({
       domain,
@@ -286,25 +286,9 @@ function parseRdapResponse(raw: Record<string, unknown>): DomainRegistrationDeta
       }
     }
   }
-  if (!out.contact) {
-    for (const role of ["administrative", "technical", "billing", "abuse"]) {
-      const ent = allEntities.find((e) => {
-        const r = e.roles ?? e.role;
-        const rs = Array.isArray(r) ? r.map((x) => String(x).toLowerCase()) : r != null ? [String(r).toLowerCase()] : [];
-        return rs.includes(role) || rs.some((x) => x.includes(role));
-      });
-      if (ent) {
-        const vcard = parseVcard(ent.vcardArray);
-        if (vcard.email || vcard.tel || vcard.adr) {
-          out.contactEmail = vcard.email || undefined;
-          out.contactPhone = vcard.tel || undefined;
-          out.contactAddress = vcard.adr || undefined;
-          out.contact = buildContactString(vcard);
-          break;
-        }
-      }
-    }
-  }
+  // Note: we intentionally do NOT fall back to abuse/administrative/technical
+  // contacts. Those belong to the registrar (e.g. abuse@godaddy.com), not the
+  // domain owner. Showing them as owner contact info would be misleading.
   const rawAny = raw as Record<string, unknown>;
   if (!out.registrar && typeof rawAny.registrar === "string") out.registrar = rawAny.registrar;
   if (!out.registrant && typeof rawAny.registrant === "string") out.registrant = rawAny.registrant;

@@ -5,7 +5,7 @@
  * Free tier: 300 emails/day.
  *
  * Two email types:
- *   1. Verification — confirm email when creating a watch
+ *   1. Verification — confirm email when setting up a notification
  *   2. Availability — domain became available, go buy it
  */
 
@@ -72,21 +72,21 @@ export async function sendVerificationEmail(
 
   await sendEmail(
     email,
-    `Verify your watch for ${domain}`,
+    `Confirm notification for ${domain}`,
     `
       <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 0;">
         <h2 style="margin: 0 0 8px;">Donadomains</h2>
-        <p style="color: #666; margin: 0 0 24px;">Domain Watch Verification</p>
+        <p style="color: #666; margin: 0 0 24px;">Email Verification</p>
 
-        <p>You requested to watch <strong>${escapeHtml(domain)}</strong> and be notified when it becomes available.</p>
+        <p>You requested to be notified when <strong>${escapeHtml(domain)}</strong> becomes available for registration.</p>
 
-        <p>Click below to confirm your email and start monitoring:</p>
+        <p>Click below to confirm your email and activate notifications:</p>
 
         <a href="${url}"
            style="display: inline-block; background: #000; color: #fff; padding: 12px 24px;
                   text-decoration: none; font-weight: bold; text-transform: uppercase;
                   letter-spacing: 0.05em; margin: 16px 0;">
-          Verify &amp; Start Watching
+          Verify &amp; Activate
         </a>
 
         <p style="color: #999; font-size: 13px; margin-top: 24px;">
@@ -117,7 +117,7 @@ export async function sendAvailabilityEmail(
             ${escapeHtml(domain)} is available!
           </p>
           <p style="margin: 8px 0 0; color: #666;">
-            The domain you were watching is now available for registration.
+            The domain you were monitoring is now available for registration.
           </p>
         </div>
 
@@ -131,7 +131,7 @@ export async function sendAvailabilityEmail(
         </a>
 
         <p style="color: #999; font-size: 13px; margin-top: 32px;">
-          <a href="${unsubUrl}" style="color: #999;">Stop watching this domain</a>
+          <a href="${unsubUrl}" style="color: #999;">Unsubscribe from this notification</a>
         </p>
       </div>
     `,

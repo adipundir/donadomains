@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { verifyWatchAction, unwatchDomainAction } from "@/app/actions";
+import { verifyNotificationAction, unsubscribeAction } from "@/app/actions";
 
 function VerifyContent() {
   const params = useSearchParams();
@@ -15,12 +15,12 @@ function VerifyContent() {
 
   useEffect(() => {
     if (unwatch) {
-      unwatchDomainAction(unwatch).then((r) => {
+      unsubscribeAction(unwatch).then((r) => {
         setStatus(r.success ? "success" : "error");
-        setMessage(r.success ? "Watch removed. You won't receive any more notifications." : (r.error || "Failed"));
+        setMessage(r.success ? "Unsubscribed. You won't receive any more notifications for this domain." : (r.error || "Failed"));
       });
     } else if (token) {
-      verifyWatchAction(token).then((r) => {
+      verifyNotificationAction(token).then((r) => {
         setStatus(r.success ? "success" : "error");
         setMessage(r.success ? "Email verified! We'll notify you when the domain becomes available." : (r.error || "Failed"));
         if (r.domain) setDomain(r.domain);
@@ -37,7 +37,7 @@ function VerifyContent() {
         <div className="flex items-center justify-center gap-2 py-8">
           <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent)] loading-stage-pulse" />
           <span className="font-comic-body text-sm font-bold opacity-50">
-            {unwatch ? "Removing watch..." : "Verifying..."}
+            {unwatch ? "Unsubscribing..." : "Verifying..."}
           </span>
         </div>
       )}
@@ -49,13 +49,13 @@ function VerifyContent() {
               <polyline points="20 6 9 17 4 12" />
             </svg>
             <span className="font-comic-title uppercase tracking-wide text-sm">
-              {unwatch ? "Removed" : "Verified"}
+              {unwatch ? "Unsubscribed" : "Verified"}
             </span>
           </div>
           <p className="font-comic-body font-bold">{message}</p>
           {domain && (
             <p className="font-comic-body text-sm opacity-60">
-              Watching: <strong>{domain}</strong>
+              Monitoring: <strong>{domain}</strong>
             </p>
           )}
         </div>
