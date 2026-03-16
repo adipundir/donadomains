@@ -51,10 +51,8 @@ export async function GET(req: NextRequest) {
   /** DNS-verify a set of domains returned by registrars. */
   async function dnsVerify(domains: string[]) {
     const availability = new Map<string, boolean>();
-    const unique = [...new Set(domains)];
-
     const probes = await Promise.all(
-      unique.map(async (domain) => {
+      domains.map(async (domain) => {
         try {
           const probe = await Promise.race([
             probeDns(domain),

@@ -226,15 +226,13 @@ const EXAMPLE_SEARCH_JSON = `{
           "priceNum": 1.08,
           "renewalPrice": "$9.08/yr",
           "renewalPriceNum": 9.08,
-          "isCheapest": true,
-          "source": "scraped"
+          "isCheapest": true
         },
         {
           "name": "GoDaddy",
           "url": "https://godaddy.com/...",
           "price": "$2.99/yr",
-          "priceNum": 2.99,
-          "source": "scraped"
+          "priceNum": 2.99
         }
       ],
       "registerUrl": "https://namecheap.com/..."
@@ -252,9 +250,9 @@ const EXAMPLE_SEARCH_JSON = `{
     }
   ],
   "sources": [
-    { "name": "DNS", "status": "ok", "count": 20 },
     { "name": "Namecheap", "status": "ok", "count": 15 },
-    { "name": "GoDaddy", "status": "ok", "count": 12 }
+    { "name": "GoDaddy", "status": "ok", "count": 12 },
+    { "name": "Spaceship", "status": "ok", "count": 18 }
   ]
 }`;
 
@@ -402,7 +400,7 @@ export default function DocsPage() {
               <FieldRow
                 name="q"
                 type="string"
-                desc='Search keyword. Can be a bare word (e.g. "donadomains") or a full domain (e.g. "donadomains.xyz"). A bare word searches across 20 common TLDs.'
+                desc='Search keyword. Can be a bare word (e.g. "donadomains") or a full domain (e.g. "donadomains.xyz"). Registrars dynamically discover available TLDs for the keyword.'
               />
               <FieldRow
                 name="stream"
@@ -465,7 +463,7 @@ for domain in available:
                 <h3 className="font-comic-title text-lg">Streaming Response</h3>
               </div>
               <p className="opacity-70 text-sm mb-4">
-                Results arrive progressively via Server-Sent Events as each registrar completes. DNS results appear in ~200ms, pricing fills in over 2-8 seconds. Best for building real-time UIs with progress indicators.
+                Results arrive progressively via Server-Sent Events as each registrar completes. Each batch includes DNS-verified availability. Registrar results stream in over 2-8 seconds, followed by RDAP enrichment for taken domains. Best for building real-time UIs with progress indicators.
               </p>
 
               <CodeBlock title="curl">{`curl -N "https://donadomains.xyz/api/search?q=donadomains&stream=true"`}</CodeBlock>
@@ -521,8 +519,8 @@ for line in res.iter_lines():
 
               <p className="font-comic-title text-sm mt-4 mb-2">Event Types</p>
               <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-                <FieldRow name="init" type="event" desc="Sent first. Contains the list of registrar names being queried." />
-                <FieldRow name="batch" type="event" desc="Sent each time a registrar completes. Contains the full merged results so far." />
+                <FieldRow name="init" type="event" desc="Sent first. Contains the list of registrar names being scraped (e.g. Namecheap, GoDaddy, Spaceship, etc.)." />
+                <FieldRow name="batch" type="event" desc="Sent each time a registrar completes. Contains the full merged and DNS-verified results so far, plus source statuses." />
                 <FieldRow name="rdap_update" type="event" desc="Registration details (registrar, dates) for a taken domain." />
                 <FieldRow name="rdap_done" type="event" desc="All RDAP lookups finished." />
                 <FieldRow name="complete" type="event" desc="All sources finished. Stream closes after this." />
@@ -550,7 +548,6 @@ for line in res.iter_lines():
               <FieldRow name="renewalPrice" type="string" desc='Formatted renewal price (e.g. "$9.08/yr")' optional />
               <FieldRow name="renewalPriceNum" type="number" desc="Numeric renewal price" optional />
               <FieldRow name="isCheapest" type="boolean" desc="True if this is the cheapest option across all registrars" optional />
-              <FieldRow name="source" type="string" desc='"scraped" — price was scraped from registrar website' />
             </div>
 
             <h3 className="font-comic-title text-xl mt-6 mb-2">Error Responses</h3>

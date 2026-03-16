@@ -36,11 +36,11 @@ async function main() {
       const links = r.buyLinks ?? [];
       const cheapest = links.find((l) => l.isCheapest);
       const priceStr = cheapest ? `${cheapest.price} at ${cheapest.name}` : "no pricing";
-      console.log(`  ${r.domain} — ${priceStr} (${r.source})`);
+      console.log(`  ${r.domain} — ${priceStr}`);
       if (links.length > 1) {
         for (const l of links) {
           const tag = l.isCheapest ? " [CHEAPEST]" : "";
-          console.log(`    ${l.name}: ${l.price} (${l.source})${tag}`);
+          console.log(`    ${l.name}: ${l.price}${tag}`);
         }
       }
     }

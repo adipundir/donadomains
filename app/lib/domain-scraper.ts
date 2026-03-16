@@ -18,12 +18,8 @@ export type { BuyLink };
 export interface DomainResult {
   domain: string;
   available: boolean;
-  price?: string;
   tld: string;
-  source?: string;
-  type?: "expired" | "auction";
   matchType?: "exact" | "similar";
-  sourceUrl?: string;
   buyLinks?: BuyLink[];
   registerUrl?: string;
   registration?: DomainRegistrationDetails;
