@@ -500,9 +500,9 @@ export default function Home() {
     setFilter("all");
 
     try {
-      console.log(`[Search] Fetching /api/search?q=${keyword.trim()}`);
+      console.log(`[Search] Fetching /api/search?q=${keyword.trim()}&stream=true`);
       const response = await fetch(
-        `/api/search?q=${encodeURIComponent(keyword.trim())}`,
+        `/api/search?q=${encodeURIComponent(keyword.trim())}&stream=true`,
         { signal: abort.signal },
       );
 
@@ -846,7 +846,15 @@ export default function Home() {
           >
             Donadomains
           </button>
-          <ThemeSwitcher />
+          <div className="flex items-center gap-3 sm:gap-4">
+            <a
+              href="/docs"
+              className="font-comic-title text-xs sm:text-sm uppercase tracking-wide opacity-60 hover:opacity-100 transition-opacity"
+            >
+              API
+            </a>
+            <ThemeSwitcher />
+          </div>
         </div>
       </nav>
 

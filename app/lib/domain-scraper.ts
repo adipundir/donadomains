@@ -36,7 +36,8 @@ export interface SourceStatus {
   error?: string;
 }
 
-export const COMMON_TLDS = [
+/** Used for keyword parsing and TLD sort order — not for DNS probing. */
+const COMMON_TLDS = [
   ".com", ".net", ".org", ".io", ".co", ".dev", ".app", ".ai",
   ".xyz", ".me", ".info", ".biz", ".us", ".tv", ".online", ".site",
   ".tech", ".store", ".club", ".world",
@@ -68,54 +69,47 @@ export function buildSearchResults(
   userTld?: string,
   dnsAvailability?: Map<string, boolean>,
 ): DomainResult[] {
-  const exactSet = new Set(COMMON_TLDS.map((tld) => `${baseName}${tld}`));
   const userExactDomain = userTld ? `${baseName}${userTld}` : null;
   const results: DomainResult[] = [];
 
-  // Union of DNS-checked domains and registrar-returned domains
-  const allDomains = new Set([
-    ...(dnsAvailability?.keys() ?? []),
-    ...domainSearchHits.keys(),
-  ]);
-
-  for (const domain of allDomains) {
-    const hits = domainSearchHits.get(domain);
-    const registrarVotes = hits ? [...hits.values()] : [];
+  // Registrar-returned domains are the primary source.
+  // DNS (when available) is the authoritative tiebreaker for availability.
+  for (const [domain, hits] of domainSearchHits) {
+    const registrarVotes = [...hits.values()];
     const anyPremium = registrarVotes.some((h) => h.premium);
 
-    // DNS is the authoritative availability signal when present.
-    // Registrar scrapers are unreliable for availability (they mark domains
-    // "not available" when they have no pricing, not just when taken).
+    // Filter out scraping artifacts — domains that don't contain the base keyword
+    // (e.g. "it.com", "gb.net" appearing when searching "donadomains")
+    if (!domain.startsWith(baseName) && !domain.includes(baseName)) continue;
+
+    // Determine availability:
+    // 1. DNS is authoritative when present
+    // 2. Fall back to registrar majority vote
     let available: boolean;
     if (dnsAvailability?.has(domain)) {
       available = !anyPremium && (dnsAvailability.get(domain) ?? false);
     } else {
-      // No DNS data: fall back to registrar signal with explicitlyTaken guard
-      available = !anyPremium && registrarVotes.some((h) => h.available);
-    }
-
-    // Only include taken domains if DNS confirmed it (the domain we actually checked).
-    // Registrar "similar" suggestions that are taken (e.g. google.com, facebook.com)
-    // are noise — skip them unless DNS specifically checked that domain.
-    if (!available) {
-      const dnsConfirmsTaken = dnsAvailability?.has(domain) && dnsAvailability.get(domain) === false;
-      if (!dnsConfirmsTaken) continue;
+      // No DNS data yet — use registrar signal (at least one says available + has pricing)
+      available = !anyPremium && registrarVotes.some((h) => h.available && h.registration != null);
     }
 
     const tld = extractTld(domain);
-    const buyLinks = available && hits ? buildMergedBuyLinks(domain, hits) : [];
+    const buyLinks = available ? buildMergedBuyLinks(domain, hits) : [];
 
-    // Hide available domains with no pricing unless it's the user's exact query.
-    // This avoids empty cards during the DNS-only phase while still showing
-    // the specific domain the user searched for.
+    // Skip available domains with no pricing (no registrar had a price)
     if (available && buyLinks.length === 0 && domain !== userExactDomain) continue;
+
+    // Skip taken domains that DNS hasn't confirmed yet (avoid showing
+    // random "similar" suggestions like google.com as taken)
+    if (!available && dnsAvailability && !dnsAvailability.has(domain)) continue;
+
+    const isExact = domain === `${baseName}${tld}`;
 
     results.push({
       domain,
       available,
       tld,
-      source: hits ? [...hits.keys()].join(" + ") : "DNS",
-      matchType: exactSet.has(domain) ? "exact" : "similar",
+      matchType: isExact ? "exact" : "similar",
       buyLinks,
       registerUrl: buyLinks[0]?.url,
     });
