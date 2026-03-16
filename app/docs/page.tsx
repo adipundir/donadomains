@@ -1,133 +1,4 @@
-"use client";
-
-import { useState } from "react";
-import { useTheme } from "next-themes";
-import { useEffect } from "react";
-
-function ThemeSwitcher() {
-  const { setTheme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const isDark = mounted && resolvedTheme === "dark";
-  return (
-    <button
-      type="button"
-      onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="p-2 rounded-full hover:bg-[var(--surface-muted)] transition-colors"
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-    >
-      {!mounted ? (
-        <span className="w-5 h-5 block" />
-      ) : isDark ? (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" /></svg>
-      ) : (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /></svg>
-      )}
-    </button>
-  );
-}
-
-function CodeBlock({ children, title }: { children: string; title?: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const copy = () => {
-    navigator.clipboard.writeText(children);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="relative my-4">
-      {title && (
-        <div
-          className="font-comic-body text-xs font-bold px-4 py-1.5 rounded-t-lg"
-          style={{
-            background: "var(--surface-muted)",
-            borderBottom: "1px solid var(--border-light)",
-            color: "var(--foreground)",
-            opacity: 0.7,
-          }}
-        >
-          {title}
-        </div>
-      )}
-      <div className="relative">
-        <pre
-          className={`overflow-x-auto p-4 text-sm leading-relaxed ${title ? "rounded-b-lg" : "rounded-lg"}`}
-          style={{
-            background: "#111111",
-            color: "#e0e0e0",
-          }}
-        >
-          <code>{children}</code>
-        </pre>
-        <button
-          type="button"
-          onClick={copy}
-          className="absolute top-2 right-2 px-2 py-1 text-xs rounded font-comic-body transition-colors"
-          style={{
-            background: copied ? "var(--green)" : "rgba(255,255,255,0.1)",
-            color: copied ? "#fff" : "#aaa",
-          }}
-        >
-          {copied ? "Copied!" : "Copy"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function TabbedCode({ tabs }: { tabs: { label: string; code: string }[] }) {
-  const [active, setActive] = useState(0);
-  const [copied, setCopied] = useState(false);
-
-  const copy = () => {
-    navigator.clipboard.writeText(tabs[active].code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="relative my-4">
-      <div className="flex" style={{ background: "var(--surface-muted)", borderBottom: "1px solid var(--border-light)", borderRadius: "8px 8px 0 0" }}>
-        {tabs.map((tab, i) => (
-          <button
-            key={tab.label}
-            type="button"
-            onClick={() => setActive(i)}
-            className="font-comic-body text-xs font-bold px-4 py-1.5 transition-colors"
-            style={{
-              color: i === active ? "var(--foreground)" : "var(--foreground)",
-              opacity: i === active ? 1 : 0.4,
-              borderBottom: i === active ? "2px solid var(--accent)" : "2px solid transparent",
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-      <div className="relative">
-        <pre
-          className="overflow-x-auto p-4 text-sm leading-relaxed rounded-b-lg"
-          style={{ background: "#111111", color: "#e0e0e0" }}
-        >
-          <code>{tabs[active].code}</code>
-        </pre>
-        <button
-          type="button"
-          onClick={copy}
-          className="absolute top-2 right-2 px-2 py-1 text-xs rounded font-comic-body transition-colors"
-          style={{
-            background: copied ? "var(--green)" : "rgba(255,255,255,0.1)",
-            color: copied ? "#fff" : "#aaa",
-          }}
-        >
-          {copied ? "Copied!" : "Copy"}
-        </button>
-      </div>
-    </div>
-  );
-}
+import { ThemeSwitcher, CodeBlock, TabbedCode, SidebarNav, CopyDocsButton } from "./components";
 
 function Badge({ children, color = "accent" }: { children: React.ReactNode; color?: "accent" | "green" }) {
   return (
@@ -263,34 +134,12 @@ const NAV_ITEMS = [
 ];
 
 export default function DocsPage() {
-  const [activeSection, setActiveSection] = useState("");
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveSection(entry.target.id);
-          }
-        }
-      },
-      { rootMargin: "-20% 0px -60% 0px" },
-    );
-
-    for (const item of NAV_ITEMS) {
-      const el = document.getElementById(item.id);
-      if (el) observer.observe(el);
-    }
-
-    return () => observer.disconnect();
-  }, []);
-
   return (
     <div
       className="min-h-screen"
       style={{ background: "var(--background)", color: "var(--foreground)" }}
     >
-      {/* Navbar — matches main page */}
+      {/* Navbar */}
       <nav className="relative z-10 py-3 sm:py-4 px-4 sm:px-6 md:px-8">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <a
@@ -300,6 +149,7 @@ export default function DocsPage() {
             Donadomains
           </a>
           <div className="flex items-center gap-3 sm:gap-4">
+            <CopyDocsButton />
             <span className="font-comic-title text-xs sm:text-sm uppercase tracking-wide opacity-60">
               API
             </span>
@@ -311,26 +161,8 @@ export default function DocsPage() {
       <div className="px-4 sm:px-6 md:px-8 py-8 sm:py-12">
         <div className="max-w-6xl mx-auto flex gap-6">
 
-        {/* Sidebar — left side on desktop */}
-        <nav className="hidden lg:block w-40 shrink-0 sticky top-6 self-start">
-          <ul className="space-y-1">
-            {NAV_ITEMS.map((item) => (
-              <li key={item.id}>
-                <a
-                  href={`#${item.id}`}
-                  className="block px-3 py-1.5 rounded text-sm font-comic-body transition-colors"
-                  style={{
-                    background: activeSection === item.id ? "var(--surface-muted)" : "transparent",
-                    fontWeight: activeSection === item.id ? 700 : 400,
-                    opacity: activeSection === item.id ? 1 : 0.7,
-                  }}
-                >
-                  {item.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        {/* Sidebar */}
+        <SidebarNav items={NAV_ITEMS} />
 
         {/* Main content */}
         <main className="flex-1 min-w-0 space-y-12">
@@ -558,7 +390,7 @@ for line in res.iter_lines():
           </Section>
 
           {/* ── Endpoint 2: Domain Info ── */}
-          <Section id="domain-info" title="Domain Info (JSON)">
+          <Section id="domain-info" title="Domain Info">
             <div
               className="rounded-lg p-4 comic-border-subtle"
               style={{ background: "var(--surface)" }}
@@ -620,7 +452,7 @@ print(intel["sources"])      # ["rdap", "dns"]` },
               <FieldRow name="registrarUrl" type="string" desc="Registrar website URL" optional />
               <FieldRow name="registrant" type="string" desc="Name of the registrant (often redacted for privacy)" optional />
               <FieldRow name="organization" type="string" desc="Registrant organization" optional />
-              <FieldRow name="contactEmail" type="string" desc="Abuse or registrant contact email" optional />
+              <FieldRow name="contactEmail" type="string" desc="Registrant contact email (only shown when not privacy-protected)" optional />
               <FieldRow name="contactPhone" type="string" desc="Contact phone number" optional />
               <FieldRow name="contactAddress" type="string" desc="Registrant address (partial, often redacted)" optional />
               <FieldRow name="nameservers" type="string[]" desc="Authoritative nameservers for the domain" optional />
@@ -631,7 +463,7 @@ print(intel["sources"])      # ["rdap", "dns"]` },
 
             <h3 className="font-comic-title text-xl mt-6 mb-2">Error Responses</h3>
             <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <FieldRow name="400" type="Bad Request" desc='Invalid domain format. Returns { "error": "Invalid domain format", "example": "example.com" }' />
+              <FieldRow name="400" type="Bad Request" desc='Invalid domain format' />
               <FieldRow name="504" type="Gateway Timeout" desc="Request took longer than 10 seconds" />
               <FieldRow name="500" type="Server Error" desc="Unexpected internal error" />
             </div>
@@ -648,7 +480,7 @@ print(intel["sources"])      # ["rdap", "dns"]` },
                 <strong>DNS-over-HTTPS</strong> — Cloudflare DoH queries. Fast (~50ms). Resolves nameservers and confirms resolution.
               </li>
               <li>
-                <strong>who.is scrape</strong> — Firecrawl-powered fallback. Only triggered when RDAP returns almost no data (no registrar, no dates). Expensive, so used sparingly.
+                <strong>who.is scrape</strong> — Firecrawl-powered fallback. Only triggered when RDAP returns almost no data. Used sparingly.
               </li>
             </ol>
           </Section>

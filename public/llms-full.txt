@@ -1,0 +1,229 @@
+# Donadomains — Full API Reference
+
+> Domain search aggregator that compares prices across 8+ registrars and provides in-depth domain intelligence. Find the cheapest place to buy any domain, or look up who owns it.
+
+Base URL: https://donadomains.xyz
+Docs: https://donadomains.xyz/docs
+Auth: None required (free, unauthenticated)
+
+---
+
+## Endpoint 1: Domain Search
+
+GET /api/search?q={keyword}
+
+Searches domain availability across 8+ registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Hostinger, Squarespace, Spaceship) in real-time. Returns live pricing with direct purchase links from each registrar, and automatically marks the cheapest option.
+
+### Parameters
+
+| Name   | Type   | Required | Description |
+|--------|--------|----------|-------------|
+| q      | string | Yes      | Search keyword (e.g. "startup") or full domain (e.g. "startup.io"). A bare keyword searches across all TLDs that registrars support. |
+| stream | string | No       | Set to "true" for Server-Sent Events streaming. Omit for a single JSON response. |
+
+### JSON Response (default)
+
+Waits for all registrars to respond (typically 5-10 seconds), then returns a single JSON object.
+
+```
+GET /api/search?q=example
+```
+
+Response shape:
+```json
+{
+  "keyword": "example",
+  "tld": null,
+  "results": [ DomainResult, ... ],
+  "sources": [ SourceStatus, ... ]
+}
+```
+
+If the query includes a TLD (e.g. "example.io"), the `tld` field will be ".io" and that exact domain will be prioritized in results.
+
+### Streaming Response (stream=true)
+
+Results arrive progressively via Server-Sent Events as each registrar completes.
+
+```
+GET /api/search?q=example&stream=true
+```
+
+Each SSE message has a `data:` prefix containing JSON. Event types:
+
+- `init` — Sent first. Contains `registrars` array listing names of registrars being queried.
+- `batch` — Sent each time a registrar completes. Contains `registrar` (name), `registrarStatus` ("ok" or "failed"), `results` (full merged results so far), `sourceStatuses` (all sources so far).
+- `rdap_update` — Sent for each taken domain with registration details. Contains `domain` and `registration` object.
+- `rdap_done` — Sent after all RDAP lookups finish.
+- `complete` — Final event. Stream closes after this.
+
+### DomainResult
+
+| Field        | Type          | Description |
+|--------------|---------------|-------------|
+| domain       | string        | Fully qualified domain name (e.g. "example.com") |
+| available    | boolean       | Whether the domain is available for registration |
+| tld          | string        | TLD including dot (e.g. ".com") |
+| matchType    | string?       | "exact" if the domain matches the keyword + a standard TLD, "similar" otherwise |
+| buyLinks     | BuyLink[]?    | Purchase links from registrars with pricing (available domains only) |
+| registerUrl  | string?       | Direct URL to register at the cheapest registrar |
+| registration | object?       | Registration details for taken domains (see below) |
+
+### BuyLink
+
+| Field           | Type    | Description |
+|-----------------|---------|-------------|
+| name            | string  | Registrar name (e.g. "GoDaddy", "Namecheap") |
+| url             | string  | Direct purchase URL — takes user to checkout |
+| price           | string? | Formatted price (e.g. "$1.08/yr") |
+| priceNum        | number? | Numeric price for sorting/comparison |
+| renewalPrice    | string? | Formatted renewal price (e.g. "$9.08/yr") |
+| renewalPriceNum | number? | Numeric renewal price |
+| isCheapest      | boolean?| True if this is the cheapest option across all registrars |
+
+### Registration (for taken domains)
+
+| Field     | Type   | Description |
+|-----------|--------|-------------|
+| registrar | string?| Name of the registrar holding the domain |
+| created   | string?| Creation date (ISO 8601) |
+| expires   | string?| Expiration date (ISO 8601) |
+| status    | string[]?| ICANN status codes |
+
+### SourceStatus
+
+| Field  | Type   | Description |
+|--------|--------|-------------|
+| name   | string | Registrar name |
+| status | string | "ok" or "failed" |
+| count  | number | Number of domains returned by this source |
+
+### Error Responses
+
+| Status | Description |
+|--------|-------------|
+| 400    | Missing or invalid `q` parameter |
+| 500    | Internal server error |
+
+### Example: JavaScript
+
+```javascript
+const res = await fetch("https://donadomains.xyz/api/search?q=myproject");
+const data = await res.json();
+
+const available = data.results.filter(r => r.available);
+const cheapest = available
+  .flatMap(r => r.buyLinks ?? [])
+  .find(l => l.isCheapest);
+
+console.log(`${available.length} domains available`);
+console.log(`Cheapest: ${cheapest?.name} at ${cheapest?.price}`);
+console.log(`Buy: ${cheapest?.url}`);
+```
+
+### Example: Python
+
+```python
+import requests
+
+res = requests.get("https://donadomains.xyz/api/search", params={"q": "myproject"})
+data = res.json()
+
+available = [r for r in data["results"] if r["available"]]
+for domain in available:
+    for link in domain.get("buyLinks", []):
+        if link.get("isCheapest"):
+            print(f"{domain['domain']} — {link['price']} at {link['name']}")
+            print(f"Buy: {link['url']}")
+```
+
+---
+
+## Endpoint 2: Domain Info
+
+GET /api/domain/{domain}
+
+Returns comprehensive domain intelligence for a single domain. Queries RDAP (registration data) and DNS-over-HTTPS (nameservers, resolution status) in parallel. Falls back to who.is scraping for domains with sparse RDAP data.
+
+### Path Parameters
+
+| Name   | Type   | Required | Description |
+|--------|--------|----------|-------------|
+| domain | string | Yes      | Fully qualified domain name (e.g. "example.com"). Must be lowercase alphanumeric with dots/hyphens, ending in a valid TLD. |
+
+### Response: DomainIntel
+
+| Field          | Type     | Description |
+|----------------|----------|-------------|
+| domain         | string   | The normalized domain queried |
+| registered     | boolean  | Whether the domain is currently registered |
+| status         | string[]?| ICANN domain status codes |
+| created        | string?  | Creation date (ISO 8601) |
+| updated        | string?  | Last updated date (ISO 8601) |
+| expires        | string?  | Expiration date (ISO 8601) |
+| registrar      | string?  | Name of the registrar |
+| registrarUrl   | string?  | Registrar website URL |
+| registrant     | string?  | Name of the registrant (often redacted for privacy) |
+| organization   | string?  | Registrant organization |
+| contactEmail   | string?  | Registrant contact email (only shown when genuinely from registrant, not registrar abuse desk) |
+| contactPhone   | string?  | Registrant contact phone |
+| contactAddress | string?  | Registrant address |
+| nameservers    | string[]?| Authoritative nameservers |
+| dnssec         | string?  | DNSSEC status (e.g. "signedDelegation") |
+| sources        | string[] | Data sources used: "rdap", "dns", "who.is" |
+| timing         | object   | Milliseconds spent per source (e.g. { "rdap": 342, "dns": 87 }) |
+
+### Error Responses
+
+| Status | Description |
+|--------|-------------|
+| 400    | Invalid domain format |
+| 504    | Request timed out (10 second limit) |
+| 500    | Internal server error |
+
+### Example: JavaScript
+
+```javascript
+const res = await fetch("https://donadomains.xyz/api/domain/github.com");
+const intel = await res.json();
+
+console.log(intel.registered);   // true
+console.log(intel.registrar);    // "MarkMonitor Inc."
+console.log(intel.expires);      // "2025-10-09T18:20:50Z"
+console.log(intel.nameservers);  // ["dns1.p08.nsone.net", ...]
+```
+
+### Example: Python
+
+```python
+import requests
+
+res = requests.get("https://donadomains.xyz/api/domain/github.com")
+intel = res.json()
+
+if intel["registered"]:
+    print(f"Registrar: {intel.get('registrar')}")
+    print(f"Expires: {intel.get('expires')}")
+    print(f"Nameservers: {intel.get('nameservers')}")
+else:
+    print("Domain is available for registration")
+```
+
+---
+
+## How It Works
+
+1. **Registrar Discovery**: When you search, we scrape 8+ registrar search pages in parallel. Each registrar returns domains across the TLDs they support — no hardcoded list.
+
+2. **DNS Verification**: We DNS-check every domain the registrars return using Cloudflare DNS-over-HTTPS. This gives authoritative available/taken status (registrars sometimes disagree).
+
+3. **Price Aggregation**: For available domains, we merge pricing from all registrars and mark the cheapest option with `isCheapest: true`.
+
+4. **RDAP Enrichment**: For taken domains, we fetch registration details (registrar, owner, expiry, nameservers) from RDAP — the modern, HTTP-based replacement for WHOIS.
+
+## Notes
+
+- No authentication required
+- Response time: ~5-10 seconds for search (registrar scraping is the bottleneck), ~1-2 seconds for domain info
+- Prices are live — scraped from registrar websites in real-time, not cached
+- Privacy: owner contact details only shown when the registrant hasn't opted into privacy protection

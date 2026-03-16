@@ -1,0 +1,83 @@
+# Donadomains
+
+> Domain search aggregator that compares prices across 8+ registrars and provides in-depth domain intelligence. Find the cheapest place to buy any domain, or look up who owns it.
+
+Base URL: https://donadomains.xyz
+
+## What We Do
+
+Donadomains searches domain availability across multiple registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, and more) in real-time. We return:
+
+- Availability status for any keyword across all common TLDs
+- Live pricing from each registrar with direct buy links
+- The cheapest registrar highlighted automatically
+- Registration details for taken domains (registrar, owner, expiry, nameservers)
+
+## API — 2 Endpoints
+
+### 1. Domain Search
+
+GET /api/search?q={keyword}
+
+Search for domain availability and compare prices. Returns a JSON response with results from 8+ registrars.
+
+Parameters:
+- q (required): Search keyword like "example" or full domain like "example.com"
+- stream (optional): Set to "true" for Server-Sent Events streaming
+
+Example: GET /api/search?q=donadomains
+
+Response:
+{
+  "keyword": "donadomains",
+  "tld": null,
+  "results": [
+    {
+      "domain": "donadomains.com",
+      "available": true,
+      "tld": ".com",
+      "matchType": "exact",
+      "buyLinks": [
+        { "name": "GoDaddy", "url": "https://...", "price": "$0.01/yr", "priceNum": 0.01, "isCheapest": true },
+        { "name": "Namecheap", "url": "https://...", "price": "$5.98/yr", "priceNum": 5.98 }
+      ],
+      "registerUrl": "https://..."
+    },
+    {
+      "domain": "donadomains.xyz",
+      "available": false,
+      "tld": ".xyz",
+      "matchType": "exact",
+      "registration": { "registrar": "Go Daddy, LLC", "created": "2026-02-14", "expires": "2027-02-14" }
+    }
+  ],
+  "sources": [
+    { "name": "GoDaddy", "status": "ok", "count": 31 },
+    { "name": "Namecheap", "status": "ok", "count": 6 }
+  ]
+}
+
+### 2. Domain Info
+
+GET /api/domain/{domain}
+
+Get detailed intelligence about a single domain. Uses RDAP and DNS-over-HTTPS.
+
+Example: GET /api/domain/example.com
+
+Response:
+{
+  "domain": "example.com",
+  "registered": true,
+  "registrar": "RESERVED-Internet Assigned Numbers Authority",
+  "created": "1995-08-14T04:00:00Z",
+  "expires": "2025-08-13T04:00:00Z",
+  "nameservers": ["a.iana-servers.net", "b.iana-servers.net"],
+  "status": ["client delete prohibited", "client transfer prohibited"],
+  "sources": ["rdap", "dns"],
+  "timing": { "rdap": 342, "dns": 87 }
+}
+
+## Full Documentation
+
+https://donadomains.xyz/docs
