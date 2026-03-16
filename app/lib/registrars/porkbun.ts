@@ -1,23 +1,41 @@
 import type {
-  RegistrarPriceResult,
-  RegistrarFetchResult,
   RegistrarModule,
   RegistrarSearchResult,
+  RegistrarSearchHit,
 } from "./types";
+
 const NAME = "Porkbun";
 const API_URL = "https://api.porkbun.com/api/json/v3/pricing/get";
-const API_TIMEOUT_MS = 45_000;
+const API_TIMEOUT_MS = 15_000;
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+/** Only generate hits for popular TLDs — leave niche discovery to Firecrawl registrars. */
+const POPULAR_TLDS = new Set([
+  "com", "net", "org", "io", "co", "dev", "app", "ai", "xyz", "me",
+  "info", "biz", "us", "tv", "online", "site", "tech", "store", "club",
+  "world", "live", "shop", "blog", "pro", "vip", "cloud", "art",
+]);
 
 type PorkbunApiResponse = {
   status?: string;
   pricing?: Record<string, { registration?: string; renewal?: string }>;
 };
 
-let apiCache: Map<string, RegistrarPriceResult> | null = null;
-let inflightPromise: Promise<Map<string, RegistrarPriceResult> | null> | null = null;
+interface TldPrice {
+  registration: number;
+  renewal: number;
+}
 
-async function fetchFromApi(): Promise<Map<string, RegistrarPriceResult> | null> {
-  if (apiCache) return apiCache;
+let apiCache: Map<string, TldPrice> | null = null;
+let cacheTimestamp = 0;
+let inflightPromise: Promise<Map<string, TldPrice> | null> | null = null;
+
+function isCacheValid(): boolean {
+  return apiCache !== null && Date.now() - cacheTimestamp < CACHE_TTL_MS;
+}
+
+async function fetchFromApi(): Promise<Map<string, TldPrice> | null> {
+  if (isCacheValid()) return apiCache;
   if (inflightPromise) return inflightPromise;
 
   inflightPromise = (async () => {
@@ -34,22 +52,21 @@ async function fetchFromApi(): Promise<Map<string, RegistrarPriceResult> | null>
       const data: PorkbunApiResponse = await res.json();
       if (data.status !== "SUCCESS" || !data.pricing) return null;
 
-      const map = new Map<string, RegistrarPriceResult>();
-      const now = Date.now();
+      const map = new Map<string, TldPrice>();
 
       for (const [tld, info] of Object.entries(data.pricing)) {
         const reg = parseFloat(String(info?.registration ?? "").replace(/,/g, ""));
         const renew = parseFloat(String(info?.renewal ?? "").replace(/,/g, ""));
         if (!isNaN(reg) && reg > 0) {
           map.set(tld.toLowerCase(), {
-            registrar: NAME, tld: tld.toLowerCase(),
-            registration: reg, renewal: isNaN(renew) ? reg : renew,
-            currency: "USD", source: "api", fetchedAt: now,
+            registration: reg,
+            renewal: isNaN(renew) ? reg : renew,
           });
         }
       }
 
       apiCache = map;
+      cacheTimestamp = Date.now();
       return map;
     } catch {
       return null;
@@ -63,41 +80,47 @@ async function fetchFromApi(): Promise<Map<string, RegistrarPriceResult> | null>
 
 
 /**
- * Porkbun's search page is a heavy SPA that doesn't render results within
- * Firecrawl's waitFor window (returns "Loading..." spinners). Scraping it
- * produces no usable data. Instead, Porkbun contributes via getPrice() which
- * uses the Porkbun bulk pricing API — accurate per-TLD pricing that gets
- * merged in Phase 2 of buildMergedBuyLinks.
+ * Fetch all TLD pricing from Porkbun's API and generate a hit for each TLD.
+ * Since we can't check availability via this endpoint, all hits are marked
+ * available: true — DNS verification happens downstream.
  */
-async function searchDomains(): Promise<RegistrarSearchResult> {
-  return { registrar: NAME, hits: [], fetchTimeMs: 0 };
-}
+async function searchDomains(query: string): Promise<RegistrarSearchResult> {
+  const start = Date.now();
+  const pricing = await fetchFromApi();
+  const elapsed = Date.now() - start;
 
-function getPrice(tld: string): RegistrarPriceResult | null {
-  const key = tld.replace(/^\./, "").toLowerCase();
-  return apiCache?.get(key) ?? null;
+  if (!pricing || pricing.size === 0) {
+    return { registrar: NAME, hits: [], fetchTimeMs: elapsed, error: "API unavailable" };
+  }
+
+  // Strip any TLD the user may have typed to get the bare keyword
+  const keyword = query.replace(/\..+$/, "").toLowerCase().trim();
+  if (!keyword) {
+    return { registrar: NAME, hits: [], fetchTimeMs: elapsed };
+  }
+
+  const hits: RegistrarSearchHit[] = [];
+
+  for (const [tld, price] of pricing) {
+    if (!POPULAR_TLDS.has(tld)) continue;
+
+    const domain = `${keyword}.${tld}`;
+    hits.push({
+      domain,
+      available: true,
+      registration: price.registration,
+      renewal: price.renewal,
+      currency: "USD",
+      buyUrl: buildBuyUrl(domain),
+    });
+  }
+
+  return { registrar: NAME, hits, fetchTimeMs: elapsed };
 }
 
 function buildBuyUrl(domain: string): string {
   return `https://porkbun.com/checkout/search?q=${encodeURIComponent(domain)}`;
 }
 
-async function fetchPricing(): Promise<RegistrarFetchResult> {
-  const start = Date.now();
-
-  if (apiCache) {
-    return { registrar: NAME, source: "api", tldCount: apiCache.size, fetchTimeMs: 0 };
-  }
-
-  const result = await fetchFromApi();
-  const elapsed = Date.now() - start;
-
-  if (result) {
-    return { registrar: NAME, source: "api", tldCount: result.size, fetchTimeMs: elapsed };
-  }
-
-  return { registrar: NAME, source: "api", tldCount: 0, fetchTimeMs: elapsed, error: "API failed" };
-}
-
-const porkbun: RegistrarModule = { name: NAME, fetchPricing, getPrice, buildBuyUrl, searchDomains };
+const porkbun: RegistrarModule = { name: NAME, buildBuyUrl, searchDomains };
 export default porkbun;

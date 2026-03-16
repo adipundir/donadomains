@@ -101,6 +101,7 @@ export async function sendAvailabilityEmail(
   email: string,
   domain: string,
   unsubToken: string,
+  cheapestPrice?: string,
 ): Promise<void> {
   const unsubUrl = `${baseUrl()}/watch/verify?unwatch=${unsubToken}`;
 
@@ -119,6 +120,7 @@ export async function sendAvailabilityEmail(
           <p style="margin: 8px 0 0; color: #666;">
             The domain you were monitoring is now available for registration.
           </p>
+          ${cheapestPrice ? `<p style="margin: 8px 0 0; color: #16a34a; font-weight: bold;">Prices starting from ${escapeHtml(cheapestPrice)}/yr</p>` : ""}
         </div>
 
         <p>Search for it on Donadomains to compare prices across registrars:</p>

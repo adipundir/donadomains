@@ -6,16 +6,17 @@ const PREMIUM_LABEL_RE = /\bpremium\b/i;
 const PREMIUM_DISCLAIMER_RE = /non[- ]?premium|not applicable to premium|premium domains only|premium names|auctionspremium|premiumgenerator/i;
 const TAKEN_RE = /taken|unavailable|registered|not available|sorry/i;
 const PREMIUM_PRICE_THRESHOLD = 500;
-const CONTEXT_LINES = 6;
+const CONTEXT_LINES = 4;
 
 const DOMAIN_RE =
-  /([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.(?:com|net|org|io|co|dev|app|ai|xyz|me|info|biz|us|tv|online|site|tech|store|club|world|live|shop|blog|uk))\b/gi;
+  /([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.(?:[a-z]{2,}\.)?[a-z]{2,})\b/gi;
 
 const URL_CONTEXT_RE = /https?:\/\/|!\[|\.png|\.jpg|\.svg|\.gif|\.webp|\.css|\.js/i;
 const INFRA_DOMAINS = new Set([
   "godaddy.com", "porkbun.com", "namecheap.com", "spaceship.com",
   "cloudflare.com", "wsimg.com", "img6.wsimg.com",
   "dynadot.com", "name.com", "hover.com", "hostinger.com", "squarespace.com",
+  "domainagents.com",
 ]);
 
 /**
@@ -30,14 +31,25 @@ const PROMO_PRICE_PATTERNS: RegExp[] = [
   /~~\$[\d,.]+~~/g,                   // "~~$12.99~~" (markdown strikethrough)
   /\bwas\s+\$[\d,.]+/gi,             // "was $12.99" (old price)
   /\boriginal(?:ly)?\s+\$[\d,.]+/gi, // "originally $12.99"
+  /\bSALE\s*\$[\d,.]+/gi,            // "SALE$8.99" or "SALE $8.99"
 ];
 
+/** Only accept USD prices — drop non-USD currencies entirely. */
+function isUsdCurrency(symbol: string): boolean {
+  return symbol.trim() === "$";
+}
+
 /** Price with a yearly indicator — high confidence it's a registration price. */
-const YEARLY_PRICE_RE = /\$\s*([\d,]+(?:\.\d{1,2})?)\s*[\/\s]*(?:yr|year|per\s+year|annually|\/\s*1\s*yr)/i;
-/** Bare dollar amount — lower confidence. */
-const BARE_PRICE_RE = /\$\s*([\d,]+(?:\.\d{1,2})?)/;
+const YEARLY_PRICE_RE = new RegExp(
+  `(?:\\$|€|£|EUR\\s*|GBP\\s*)(\\s*[\\d,]+(?:\\.\\d{1,2})?)\\s*[\\/\\s]*(?:yr|year|per\\s+year|annually|\\/\\s*1\\s*yr)`,
+  "i",
+);
+/** Bare currency amount — lower confidence. */
+const BARE_PRICE_RE = /(?:\$|€|£|EUR\s*|GBP\s*)(\s*[\d,]+(?:\.\d{1,2})?)/i;
+/** Monthly price — used to reject per-month amounts. */
+const MONTHLY_PRICE_RE = /(?:\$|€|£|EUR\s*|GBP\s*)\s*[\d,]+(?:\.\d{1,2})?\s*\/\s*(?:mo(?:nth)?)\b/i;
 /** Renewal price. */
-const RENEWAL_RE = /renew(?:s|al)?(?:\s+(?:at|price))?\s*[^$]{0,20}\$\s*([\d,]+(?:\.\d{1,2})?)/i;
+const RENEWAL_RE = /renew(?:s|al)?(?:\s+(?:at|price))?\s*[^$€£]{0,20}(?:\$|€|£|EUR\s*|GBP\s*)\s*([\d,]+(?:\.\d{1,2})?)/i;
 
 /** Remove markdown bold/italic/strikethrough markers so `**$21.07**` becomes `$21.07`. */
 function stripMarkdownFormatting(text: string): string {
@@ -59,12 +71,27 @@ function stripPromoPrices(text: string): string {
 }
 
 function extractPrice(text: string): number | undefined {
+  // Reject monthly prices (e.g. "$3,021.67/mo")
+  if (MONTHLY_PRICE_RE.test(text)) {
+    const withoutMonthly = text.replace(
+      /(?:\$|€|£|EUR\s*|GBP\s*)\s*[\d,]+(?:\.\d{1,2})?\s*\/\s*(?:mo(?:nth)?)\b[^$€£]*/gi,
+      "",
+    );
+    if (!withoutMonthly.match(BARE_PRICE_RE)) return undefined;
+    return extractPrice(withoutMonthly);
+  }
+
   const yearly = text.match(YEARLY_PRICE_RE);
   const bare = text.match(BARE_PRICE_RE);
   const match = yearly || bare;
   if (!match) return undefined;
-  const val = parseFloat(match[1].replace(/,/g, ""));
-  return isNaN(val) ? undefined : val;
+  const val = parseFloat(match[1].replace(/,/g, "").trim());
+  if (isNaN(val)) return undefined;
+
+  // Only accept USD prices — reject EUR, GBP, etc.
+  const symMatch = match[0].match(/^(\$|€|£|EUR\s*|GBP\s*)/i);
+  if (symMatch && !isUsdCurrency(symMatch[1])) return undefined;
+  return Math.round(val * 100) / 100;
 }
 
 /**

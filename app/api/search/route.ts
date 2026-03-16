@@ -9,7 +9,7 @@ import {
 import type { SourceStatus } from "@/app/lib/domain-scraper";
 import { probeDns } from "@/app/lib/domain-intel";
 
-const REGISTRAR_TIMEOUT_MS = 8_000;
+const REGISTRAR_TIMEOUT_MS = 15_000;
 const DNS_TIMEOUT_MS = 3_000;
 const RDAP_TIMEOUT_MS = 4_000;
 const MAX_RDAP_TAKEN = 8;
@@ -47,6 +47,32 @@ export async function GET(req: NextRequest) {
   console.log(`[Search] "${baseName}" (userTld=${userTld ?? "none"}, stream=${wantStream})`);
 
   // ── Shared helpers ─────────────────────────────────────────────────────
+
+  /** Pre-filter domains worth DNS-checking (skip niche TLDs from a single registrar). */
+  function filterDomainsForDns(
+    domains: string[],
+    hits: Map<string, Map<string, RegistrarSearchHit>>,
+  ): string[] {
+    return domains.filter((domain) => {
+      // Always check the user's exact domain
+      if (userTld && domain === `${baseName}${userTld}`) return true;
+      // Skip domains that don't contain the keyword
+      if (!domain.includes(baseName)) return false;
+      // Keep domains that 2+ registrars returned (cross-validated)
+      const registrarCount = hits.get(domain)?.size ?? 0;
+      if (registrarCount >= 2) return true;
+      // For single-registrar domains, only keep popular TLDs
+      const tld = "." + domain.split(".").slice(1).join(".");
+      const popularTlds = new Set([
+        ".com", ".net", ".org", ".io", ".co", ".dev", ".app", ".ai",
+        ".xyz", ".me", ".info", ".biz", ".us", ".tv", ".online", ".site",
+        ".tech", ".store", ".club", ".world", ".live", ".shop", ".blog",
+        ".pro", ".vip", ".cloud", ".art", ".space", ".fun", ".host",
+        ".email", ".life", ".network", ".business", ".website", ".page", ".solutions",
+      ]);
+      return popularTlds.has(tld);
+    });
+  }
 
   /** DNS-verify a set of domains returned by registrars. */
   async function dnsVerify(domains: string[]) {
@@ -152,8 +178,11 @@ export async function GET(req: NextRequest) {
           const status = await runRegistrar(registrar, domainPricingHits);
           sourceStatuses.push(status);
 
-          // DNS-verify newly discovered domains from this registrar
-          const newDomains = [...domainPricingHits.keys()].filter((d) => !dnsAvailability.has(d));
+          // DNS-verify newly discovered domains (only popular TLDs / cross-validated)
+          const newDomains = filterDomainsForDns(
+            [...domainPricingHits.keys()].filter((d) => !dnsAvailability.has(d)),
+            domainPricingHits,
+          );
           if (newDomains.length > 0) {
             const dnsResults = await dnsVerify(newDomains);
             for (const [d, a] of dnsResults) dnsAvailability.set(d, a);
@@ -216,8 +245,8 @@ export async function GET(req: NextRequest) {
       }),
     );
 
-    // Step 2: DNS-verify all discovered domains
-    const allDomains = [...domainPricingHits.keys()];
+    // Step 2: DNS-verify discovered domains (filtered to popular TLDs / cross-validated)
+    const allDomains = filterDomainsForDns([...domainPricingHits.keys()], domainPricingHits);
     const dnsAvailability = await dnsVerify(allDomains);
 
     // Step 3: RDAP for taken domains

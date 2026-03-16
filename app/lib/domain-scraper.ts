@@ -1,5 +1,5 @@
-import { searchAllRegistrars, buildMergedBuyLinks, ALL_REGISTRARS } from "./registrars";
-import type { BuyLink, RegistrarSearchResult, RegistrarSearchHit } from "./registrars";
+import { searchAllRegistrars, buildMergedBuyLinks } from "./registrars";
+import type { BuyLink, RegistrarSearchHit } from "./registrars";
 
 export interface DomainRegistrationDetails {
   registrar?: string;
@@ -32,12 +32,23 @@ export interface SourceStatus {
   error?: string;
 }
 
-/** Used for keyword parsing and TLD sort order — not for DNS probing. */
+/** Used for keyword parsing, TLD sort order, and filtering niche TLDs. */
 const COMMON_TLDS = [
   ".com", ".net", ".org", ".io", ".co", ".dev", ".app", ".ai",
   ".xyz", ".me", ".info", ".biz", ".us", ".tv", ".online", ".site",
   ".tech", ".store", ".club", ".world",
 ];
+
+/** Broader set of TLDs worth showing — exact matches outside this set
+ *  are only included if 2+ registrars returned them. */
+const POPULAR_TLDS = new Set([
+  ...COMMON_TLDS,
+  ".live", ".shop", ".blog", ".pro", ".vip", ".cloud", ".art",
+  ".space", ".fun", ".host", ".email", ".life", ".network",
+  ".business", ".website", ".page", ".solutions",
+]);
+
+const MAX_SIMILAR_RESULTS = 10;
 
 const TLD_ORDER: Record<string, number> = Object.fromEntries(
   COMMON_TLDS.map((tld, i) => [tld, i])
@@ -68,6 +79,8 @@ export function buildSearchResults(
   const userExactDomain = userTld ? `${baseName}${userTld}` : null;
   const results: DomainResult[] = [];
 
+  let similarCount = 0;
+
   // Registrar-returned domains are the primary source.
   // DNS (when available) is the authoritative tiebreaker for availability.
   for (const [domain, hits] of domainSearchHits) {
@@ -75,31 +88,39 @@ export function buildSearchResults(
     const anyPremium = registrarVotes.some((h) => h.premium);
 
     // Filter out scraping artifacts — domains that don't contain the base keyword
-    // (e.g. "it.com", "gb.net" appearing when searching "donadomains")
     if (!domain.startsWith(baseName) && !domain.includes(baseName)) continue;
+
+    const tld = extractTld(domain);
+    const isExact = domain === `${baseName}${tld}`;
+
+    // For exact matches (donadomains.xyz, donadomains.computer, etc.),
+    // only keep popular TLDs or TLDs that 2+ registrars returned.
+    // This prevents Hover's 470 niche TLD suggestions from flooding results.
+    if (isExact && !POPULAR_TLDS.has(tld) && hits.size < 2) continue;
+
+    // Limit "similar" suggestions (thedonadomains.com, donadomainscenter.com)
+    if (!isExact) {
+      if (similarCount >= MAX_SIMILAR_RESULTS && domain !== userExactDomain) continue;
+      similarCount++;
+    }
 
     // Determine availability:
     // 1. DNS is authoritative when present
-    // 2. Fall back to registrar majority vote
+    // 2. Fall back to registrar signal
     let available: boolean;
     if (dnsAvailability?.has(domain)) {
       available = !anyPremium && (dnsAvailability.get(domain) ?? false);
     } else {
-      // No DNS data yet — use registrar signal (at least one says available + has pricing)
       available = !anyPremium && registrarVotes.some((h) => h.available && h.registration != null);
     }
 
-    const tld = extractTld(domain);
     const buyLinks = available ? buildMergedBuyLinks(domain, hits) : [];
 
-    // Skip available domains with no pricing (no registrar had a price)
+    // Skip available domains with no pricing
     if (available && buyLinks.length === 0 && domain !== userExactDomain) continue;
 
-    // Skip taken domains that DNS hasn't confirmed yet (avoid showing
-    // random "similar" suggestions like google.com as taken)
+    // Skip taken domains that DNS hasn't confirmed yet
     if (!available && dnsAvailability && !dnsAvailability.has(domain)) continue;
-
-    const isExact = domain === `${baseName}${tld}`;
 
     results.push({
       domain,

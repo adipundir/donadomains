@@ -44,6 +44,9 @@ export async function firecrawlScrape(
       formats: ["markdown"],
       waitFor: waitMs,
       timeout: 30000,
+      headers: {
+        "Accept-Language": "en-US,en;q=0.9",
+      },
     });
     return {
       success: true,

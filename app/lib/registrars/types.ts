@@ -1,21 +1,3 @@
-export interface RegistrarPriceResult {
-  registrar: string;
-  tld: string;
-  registration: number;
-  renewal: number;
-  currency: "USD";
-  source: "api" | "scraped";
-  fetchedAt: number;
-}
-
-export interface RegistrarFetchResult {
-  registrar: string;
-  source: "api" | "scraped";
-  tldCount: number;
-  fetchTimeMs: number;
-  error?: string;
-}
-
 export interface BuyLink {
   name: string;
   url: string;
@@ -24,10 +6,13 @@ export interface BuyLink {
   renewalPrice?: string;
   renewalPriceNum?: number;
   isCheapest?: boolean;
+  /** True when the registration price is a first-year promotional rate significantly below renewal. */
+  promo?: boolean;
+  /** True when this link has the lowest renewal price (best long-term value). */
+  cheapestLongTerm?: boolean;
+  premium?: boolean;
   source: "api" | "scraped";
 }
-
-export type PricingMap = Map<string, RegistrarPriceResult>;
 
 /** A single domain result returned by a registrar's search page. */
 export interface RegistrarSearchHit {
@@ -59,8 +44,6 @@ export interface RegistrarSearchResult {
 
 export interface RegistrarModule {
   name: string;
-  fetchPricing(): Promise<RegistrarFetchResult>;
-  getPrice(tld: string): RegistrarPriceResult | null;
   buildBuyUrl(domain: string): string;
   searchDomains(query: string): Promise<RegistrarSearchResult>;
 }

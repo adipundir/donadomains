@@ -15,7 +15,9 @@ import { eq, and, lte, isNull, isNotNull, sql } from "drizzle-orm";
 import { checkDomain } from "@/app/lib/watch/check";
 import { sendAvailabilityEmail } from "@/app/lib/watch/notify";
 import { computeNextCheck } from "@/app/lib/watch/schedule";
+import { searchAllRegistrars, buildMergedBuyLinks } from "@/app/lib/registrars";
 import type { WatchStatus } from "@/app/lib/watch/types";
+import type { RegistrarSearchHit } from "@/app/lib/registrars";
 
 // ─── Scheduler: fan out due watches ─────────────────────────────────────────
 
@@ -129,6 +131,28 @@ export const executeDomainCheck = inngest.createFunction(
 
     // 5. Notify if domain became available
     if (result.status === "available") {
+      // 5a. Quick registrar search to get pricing for the email
+      const cheapestPrice = await step.run("fetch-pricing", async () => {
+        try {
+          const searchResults = await searchAllRegistrars(watch.domain);
+          const hitsMap = new Map<string, RegistrarSearchHit>();
+          for (const sr of searchResults) {
+            for (const hit of sr.hits) {
+              if (hit.domain.toLowerCase() === watch.domain.toLowerCase() && hit.available && hit.registration != null) {
+                hitsMap.set(sr.registrar, hit);
+              }
+            }
+          }
+          const buyLinks = buildMergedBuyLinks(watch.domain, hitsMap);
+          const cheapest = buyLinks.find((l) => l.isCheapest);
+          return cheapest?.price ? cheapest.price.replace("/yr", "") : null;
+        } catch (err) {
+          console.error(`[Watch ${watchId}] Pricing lookup failed for ${watch.domain}:`, err);
+          return null;
+        }
+      });
+
+      // 5b. Send email with pricing info
       await step.run("send-notification", async () => {
         const db = getDb();
 
@@ -142,7 +166,7 @@ export const executeDomainCheck = inngest.createFunction(
         });
 
         try {
-          await sendAvailabilityEmail(watch.email, watch.domain, unsubToken);
+          await sendAvailabilityEmail(watch.email, watch.domain, unsubToken, cheapestPrice ?? undefined);
         } catch (err) {
           console.error(`[Watch ${watchId}] Failed to send availability email for ${watch.domain}:`, err);
           // Clean up the unsubscribe token since email didn't send

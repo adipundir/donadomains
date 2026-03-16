@@ -65,6 +65,24 @@ function formatStatus(status?: string[]): string {
   return status.map((s) => STATUS_LABELS[s] || s).join(", ");
 }
 
+/** 5-year total cost: registration + 4 × renewal. Only shown when renewal price is known. */
+function fiveYearCost(link: BuyLink): number | null {
+  if (link.priceNum == null || link.renewalPriceNum == null) return null;
+  return link.priceNum + 4 * link.renewalPriceNum;
+}
+
+function cheapest5yr(links?: BuyLink[]): { cost: number; name: string } | null {
+  if (!links?.length) return null;
+  let best: { cost: number; name: string } | null = null;
+  for (const l of links) {
+    const c = fiveYearCost(l);
+    if (c != null && (best === null || c < best.cost)) {
+      best = { cost: c, name: l.name };
+    }
+  }
+  return best;
+}
+
 function SearchIcon({ className }: { className?: string }) {
   return (
     <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -657,23 +675,54 @@ export default function Home() {
       {result.available && result.buyLinks && result.buyLinks.length > 0 ? (
         <div className="mt-3 sm:mt-4 pt-3 border-t border-[var(--border-light)]">
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
-            {result.buyLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-bold transition-all ${link.isCheapest
-                  ? "bg-[var(--foreground)] text-[var(--background)] border-2 border-[var(--foreground)] shadow-[2px_2px_0px_var(--accent)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px]"
-                  : "border border-[var(--border-light)] hover:border-[var(--border)] bg-[var(--surface)]"
-                  }`}
-              >
-                <span className="font-comic-title uppercase tracking-wide">{link.name}</span>
-                {link.price && <span className={link.isCheapest ? "font-comic-title" : ""}>{link.price}</span>}
-                {link.isCheapest && <StarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[var(--accent)]" />}
-              </a>
-            ))}
+            {result.buyLinks.map((link) => {
+              const total5yr = fiveYearCost(link);
+              return (
+                <a
+                  key={link.name}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`inline-flex flex-col items-start px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-bold transition-all ${link.premium
+                    ? "border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/30 hover:border-amber-600"
+                    : link.isCheapest
+                    ? "bg-[var(--foreground)] text-[var(--background)] border-2 border-[var(--foreground)] shadow-[2px_2px_0px_var(--accent)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px]"
+                    : "border border-[var(--border-light)] hover:border-[var(--border)] bg-[var(--surface)]"
+                    }`}
+                >
+                  <span className="inline-flex items-center gap-1 sm:gap-1.5">
+                    {link.premium && <span className="font-comic-title text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400">Premium</span>}
+                    {link.promo && !link.premium && <span className="font-comic-title text-[10px] uppercase tracking-wider text-orange-500">1st yr</span>}
+                    <span className="font-comic-title uppercase tracking-wide">{link.name}</span>
+                    {link.price && <span className={link.isCheapest && !link.premium ? "font-comic-title" : ""}>{link.price}</span>}
+                    {link.isCheapest && !link.premium && <StarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[var(--accent)]" />}
+                    {link.cheapestLongTerm && !link.isCheapest && <span className="text-[9px] font-comic-title uppercase text-[var(--green)]">best value</span>}
+                  </span>
+                  {link.renewalPrice && (
+                    <span className={`text-[10px] ${link.promo ? "text-red-500 font-bold" : link.renewalPriceNum != null && link.priceNum != null && link.renewalPriceNum >= link.priceNum * 2 ? "text-red-500 font-bold" : link.isCheapest ? "opacity-70" : "opacity-50"}`}>
+                      {link.promo ? `then ${link.renewalPrice}` : `renews ${link.renewalPrice}`}
+                    </span>
+                  )}
+                  {total5yr != null && (
+                    <span className={`text-[10px] ${link.isCheapest ? "opacity-70" : "opacity-50"}`}>5yr: ${total5yr.toFixed(2)}</span>
+                  )}
+                </a>
+              );
+            })}
           </div>
+          {(() => {
+            const best5 = cheapest5yr(result.buyLinks);
+            const cheapestReg = result.buyLinks.find((l) => l.isCheapest);
+            // Only show if cheapest 5yr differs from cheapest registration price
+            if (best5 && cheapestReg && best5.name !== cheapestReg.name) {
+              return (
+                <p className="mt-2 font-comic-body text-xs opacity-60">
+                  Cheapest 5yr: <span className="font-bold">${best5.cost.toFixed(2)}</span> at <span className="font-bold">{best5.name}</span>
+                </p>
+              );
+            }
+            return null;
+          })()}
         </div>
       ) : result.available && loading ? (
         <div className="mt-3 sm:mt-4 pt-3 border-t border-[var(--border-light)]">
@@ -752,7 +801,23 @@ export default function Home() {
           {result.available && cheapest ? (
             <span className="font-comic-body text-sm font-bold">
               from <span className="text-[var(--green)]">{cheapest.price}</span>
+              {cheapest.renewalPrice && (
+                <span className={`ml-1 text-xs ${cheapest.renewalPriceNum != null && cheapest.priceNum != null && cheapest.renewalPriceNum >= cheapest.priceNum * 2 ? "text-red-500" : "opacity-40"}`}>
+                  &rarr; {cheapest.renewalPrice}
+                </span>
+              )}
               <span className="opacity-40 ml-1">· {cheapest.name}</span>
+              {(() => {
+                const best5 = cheapest5yr(result.buyLinks);
+                if (best5) {
+                  return (
+                    <span className="opacity-40 ml-2 text-xs">
+                      · 5yr: ${best5.cost.toFixed(2)}{best5.name !== cheapest.name ? ` (${best5.name})` : ""}
+                    </span>
+                  );
+                }
+                return null;
+              })()}
             </span>
           ) : !result.available ? (
             result.registration ? (
@@ -782,14 +847,24 @@ export default function Home() {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold transition-all ${link.isCheapest
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold transition-all ${link.premium
+                    ? "border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/30"
+                    : link.isCheapest
                     ? "bg-[var(--foreground)] text-[var(--background)] border border-[var(--foreground)]"
                     : "border border-[var(--border-light)] hover:border-[var(--border)]"
                     }`}
                 >
+                  {link.premium && <span className="font-comic-title text-[9px] uppercase tracking-wider text-amber-600 dark:text-amber-400">Premium</span>}
+                  {link.promo && !link.premium && <span className="font-comic-title text-[9px] uppercase tracking-wider text-orange-500">1st yr</span>}
                   <span className="font-comic-title uppercase tracking-wide">{link.name}</span>
                   {link.price && <span className="opacity-70">{link.price}</span>}
-                  {link.isCheapest && <StarIcon className="w-3 h-3 text-[var(--accent)]" />}
+                  {link.renewalPrice && (
+                    <span className={`text-[10px] ${link.promo ? "text-red-500 font-bold" : link.renewalPriceNum != null && link.priceNum != null && link.renewalPriceNum >= link.priceNum * 2 ? "text-red-500 font-bold" : "opacity-50"}`}>
+                      {link.promo ? `then ${link.renewalPrice}` : `→ ${link.renewalPrice}`}
+                    </span>
+                  )}
+                  {link.isCheapest && !link.premium && <StarIcon className="w-3 h-3 text-[var(--accent)]" />}
+                  {link.cheapestLongTerm && !link.isCheapest && <span className="text-[8px] font-comic-title uppercase text-[var(--green)]">best value</span>}
                 </a>
               ))}
               {result.buyLinks.length > 3 && (
@@ -919,6 +994,80 @@ export default function Home() {
                   resultCount={results.length}
                   startTime={loadingStart}
                 />
+              )}
+
+              {/* Skeleton loading cards — shown before first results arrive */}
+              {loading && results.length === 0 && (
+                viewMode === "card" ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="p-3 sm:p-4 md:p-5 border-2 border-[var(--border-light)] bg-[var(--surface-muted)] animate-pulse flex flex-col"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2.5">
+                              <div className="h-6 sm:h-7 rounded bg-[var(--border-light)]" style={{ width: `${100 + (i % 4) * 30}px` }} />
+                              <div className="h-4 w-16 rounded bg-[var(--border-light)]" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-3 sm:mt-4 pt-3 border-t border-[var(--border-light)]">
+                          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                            <div className="h-8 w-24 rounded bg-[var(--border-light)]" />
+                            <div className="h-8 w-28 rounded bg-[var(--border-light)]" />
+                            <div className="h-8 w-20 rounded bg-[var(--border-light)]" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    {/* Card fallback for mobile */}
+                    <div className="grid grid-cols-1 gap-3 md:hidden">
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="p-3 sm:p-4 md:p-5 border-2 border-[var(--border-light)] bg-[var(--surface-muted)] animate-pulse flex flex-col"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="h-6 rounded bg-[var(--border-light)]" style={{ width: `${100 + (i % 4) * 30}px` }} />
+                            <div className="h-4 w-16 rounded bg-[var(--border-light)]" />
+                          </div>
+                          <div className="mt-3 pt-3 border-t border-[var(--border-light)]">
+                            <div className="flex gap-1.5">
+                              <div className="h-8 w-24 rounded bg-[var(--border-light)]" />
+                              <div className="h-8 w-28 rounded bg-[var(--border-light)]" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {/* List skeleton for md+ */}
+                    <div className="hidden md:block border-t border-[var(--border-light)]">
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-4 px-4 py-3 border-b border-[var(--border-light)] animate-pulse"
+                        >
+                          <div className="flex items-center gap-2 min-w-[260px]">
+                            <div className="h-5 rounded bg-[var(--border-light)]" style={{ width: `${120 + (i % 4) * 25}px` }} />
+                            <div className="h-4 w-16 rounded bg-[var(--border-light)]" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="h-4 w-32 rounded bg-[var(--border-light)]" />
+                          </div>
+                          <div className="flex gap-2">
+                            <div className="h-7 w-20 rounded bg-[var(--border-light)]" />
+                            <div className="h-7 w-24 rounded bg-[var(--border-light)]" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )
               )}
 
               {results.length > 0 && (() => {

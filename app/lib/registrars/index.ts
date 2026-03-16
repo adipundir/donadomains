@@ -4,26 +4,25 @@ import type {
   RegistrarSearchHit,
   BuyLink,
 } from "./types";
+
 import godaddy from "./godaddy";
 import namecheap from "./namecheap";
-import spaceship from "./spaceship";
 import dynadot from "./dynadot";
 import namecom from "./namecom";
 import hover from "./hover";
-import hostinger from "./hostinger";
-import squarespace from "./squarespace";
+import porkbun from "./porkbun";
+import cloudflare from "./cloudflare";
 
 export type { BuyLink, RegistrarSearchResult, RegistrarSearchHit } from "./types";
 
 export const ALL_REGISTRARS: RegistrarModule[] = [
   namecheap,
   godaddy,
-  spaceship,
   dynadot,
   namecom,
   hover,
-  hostinger,
-  squarespace,
+  porkbun,
+  cloudflare,
 ];
 
 /**
@@ -33,7 +32,7 @@ export const ALL_REGISTRARS: RegistrarModule[] = [
  * which returns availability + pricing for many TLDs at once.
  * This is far more efficient than checking each domain individually.
  */
-const SEARCH_TIMEOUT_MS = 8_000;
+const SEARCH_TIMEOUT_MS = 15_000;
 
 export async function searchAllRegistrars(query: string): Promise<RegistrarSearchResult[]> {
   const results = await Promise.all(
@@ -64,8 +63,10 @@ export function buildMergedBuyLinks(
   const links: BuyLink[] = [];
 
   for (const [registrar, hit] of searchHits) {
-    if (hit.premium) continue;
     if (hit.registration != null) {
+      const isPromo =
+        hit.registration < 1.00 ||
+        (hit.renewal != null && hit.renewal > hit.registration * 3);
       links.push({
         name: registrar,
         url: hit.buyUrl,
@@ -73,17 +74,30 @@ export function buildMergedBuyLinks(
         priceNum: hit.registration,
         renewalPrice: hit.renewal != null ? `$${hit.renewal.toFixed(2)}/yr` : undefined,
         renewalPriceNum: hit.renewal,
+        premium: hit.premium || undefined,
+        promo: isPromo || undefined,
         source: "scraped",
       });
     }
   }
 
-  // Mark cheapest
-  const priced = links.filter((l) => l.priceNum != null);
-  if (priced.length > 0) {
-    const minPrice = Math.min(...priced.map((l) => l.priceNum!));
-    for (const l of priced) {
+  // Mark cheapest — prefer non-promo links over promo ones
+  const nonPromo = links.filter((l) => l.priceNum != null && !l.promo && !l.premium);
+  const promoOnly = links.filter((l) => l.priceNum != null && l.promo && !l.premium);
+  const cheapestPool = nonPromo.length > 0 ? nonPromo : promoOnly;
+  if (cheapestPool.length > 0) {
+    const minPrice = Math.min(...cheapestPool.map((l) => l.priceNum!));
+    for (const l of cheapestPool) {
       if (l.priceNum === minPrice) l.isCheapest = true;
+    }
+  }
+
+  // Mark cheapest long-term (by renewal price, non-promo only)
+  const withRenewal = links.filter((l) => l.renewalPriceNum != null && !l.premium);
+  if (withRenewal.length > 0) {
+    const minRenewal = Math.min(...withRenewal.map((l) => l.renewalPriceNum!));
+    for (const l of withRenewal) {
+      if (l.renewalPriceNum === minRenewal) l.cheapestLongTerm = true;
     }
   }
 
