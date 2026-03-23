@@ -1,0 +1,161 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Donadomains API",
+    "description": "Domain search aggregator — compare prices across 6 registrars and get detailed domain intelligence.",
+    "version": "1.0.0",
+    "contact": {
+      "url": "https://donadomains.xyz/docs"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://donadomains.xyz"
+    }
+  ],
+  "paths": {
+    "/api/search": {
+      "get": {
+        "operationId": "searchDomains",
+        "summary": "Search domain availability and compare prices",
+        "description": "Searches domain availability across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun) in real-time. Returns live pricing with direct purchase links and marks the cheapest option.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Search keyword (e.g. \"startup\") or full domain (e.g. \"startup.io\")",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "stream",
+            "in": "query",
+            "required": false,
+            "description": "Set to \"true\" for Server-Sent Events streaming",
+            "schema": { "type": "string", "enum": ["true"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results with pricing from multiple registrars",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "keyword": { "type": "string", "description": "The parsed search keyword" },
+                    "tld": { "type": ["string", "null"], "description": "Extracted TLD if query included one (e.g. \".io\"), null otherwise" },
+                    "results": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/DomainResult" }
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/SourceStatus" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid q parameter"
+          }
+        }
+      }
+    },
+    "/api/domain/{domain}": {
+      "get": {
+        "operationId": "getDomainInfo",
+        "summary": "Get detailed domain intelligence",
+        "description": "Returns comprehensive domain intelligence from RDAP and DNS-over-HTTPS. Includes registrar, dates, status, nameservers, and contact info when available.",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "description": "Fully qualified domain name (e.g. \"example.com\")",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Domain intelligence",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DomainIntel" }
+              }
+            }
+          },
+          "400": { "description": "Invalid domain format" },
+          "504": { "description": "Request timed out" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DomainResult": {
+        "type": "object",
+        "properties": {
+          "domain": { "type": "string", "description": "Fully qualified domain name" },
+          "available": { "type": "boolean", "description": "Whether the domain is available for registration" },
+          "tld": { "type": "string", "description": "TLD including dot (e.g. \".com\")" },
+          "matchType": { "type": "string", "enum": ["exact", "similar"] },
+          "buyLinks": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/BuyLink" },
+            "description": "Purchase links with pricing (empty array for taken domains)"
+          },
+          "registerUrl": { "type": "string", "description": "URL to register at the cheapest registrar" }
+        },
+        "required": ["domain", "available", "tld"]
+      },
+      "BuyLink": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Registrar name" },
+          "url": { "type": "string", "description": "Direct purchase URL" },
+          "price": { "type": "string", "description": "Formatted price (e.g. \"$9.99/yr\")" },
+          "priceNum": { "type": "number", "description": "Numeric price for comparison" },
+          "isCheapest": { "type": "boolean", "description": "True if cheapest across all registrars" },
+          "premium": { "type": "boolean", "description": "True if premium/aftermarket listing" },
+          "source": { "type": "string", "description": "Always \"scraped\"" }
+        },
+        "required": ["name", "url", "source"]
+      },
+      "SourceStatus": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Registrar name" },
+          "status": { "type": "string", "enum": ["ok", "failed"] },
+          "count": { "type": "integer", "description": "Number of domains returned" }
+        },
+        "required": ["name", "status", "count"]
+      },
+      "DomainIntel": {
+        "type": "object",
+        "properties": {
+          "domain": { "type": "string" },
+          "registered": { "type": "boolean" },
+          "status": { "type": "array", "items": { "type": "string" } },
+          "created": { "type": "string", "format": "date-time" },
+          "updated": { "type": "string", "format": "date-time" },
+          "expires": { "type": "string", "format": "date-time" },
+          "registrar": { "type": "string" },
+          "registrarUrl": { "type": "string" },
+          "registrant": { "type": "string" },
+          "organization": { "type": "string" },
+          "contactEmail": { "type": "string" },
+          "contactPhone": { "type": "string" },
+          "contactAddress": { "type": "string" },
+          "nameservers": { "type": "array", "items": { "type": "string" } },
+          "dnssec": { "type": "string" },
+          "sources": { "type": "array", "items": { "type": "string" } },
+          "timing": { "type": "object", "additionalProperties": { "type": "number" } }
+        },
+        "required": ["domain", "registered", "sources", "timing"]
+      }
+    }
+  }
+}

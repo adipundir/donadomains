@@ -91,39 +91,38 @@ const EXAMPLE_SEARCH_JSON = `{
       "matchType": "exact",
       "buyLinks": [
         {
-          "name": "Namecheap",
-          "url": "https://namecheap.com/...",
-          "price": "$1.08/yr",
-          "priceNum": 1.08,
-          "renewalPrice": "$9.08/yr",
-          "renewalPriceNum": 9.08,
-          "isCheapest": true
+          "name": "Dynadot",
+          "url": "https://dynadot.com/...",
+          "price": "$13.17/yr",
+          "priceNum": 13.17,
+          "source": "scraped"
         },
         {
           "name": "GoDaddy",
           "url": "https://godaddy.com/...",
-          "price": "$2.99/yr",
-          "priceNum": 2.99
+          "price": "$0.99/yr",
+          "priceNum": 0.99,
+          "isCheapest": true,
+          "source": "scraped"
         }
       ],
-      "registerUrl": "https://namecheap.com/..."
+      "registerUrl": "https://godaddy.com/..."
     },
     {
       "domain": "example.com",
       "available": false,
       "tld": ".com",
       "matchType": "exact",
-      "registration": {
-        "registrar": "RESERVED-Internet Assigned Numbers Authority",
-        "created": "1995-08-14T04:00:00Z",
-        "expires": "2025-08-13T04:00:00Z"
-      }
+      "buyLinks": []
     }
   ],
   "sources": [
-    { "name": "Namecheap", "status": "ok", "count": 15 },
-    { "name": "GoDaddy", "status": "ok", "count": 12 },
-    { "name": "Spaceship", "status": "ok", "count": 18 }
+    { "name": "Dynadot", "status": "ok", "count": 45 },
+    { "name": "Name.com", "status": "ok", "count": 27 },
+    { "name": "GoDaddy", "status": "ok", "count": 33 },
+    { "name": "Namecheap", "status": "ok", "count": 6 },
+    { "name": "Hover", "status": "ok", "count": 490 },
+    { "name": "Porkbun", "status": "failed", "count": 0 }
   ]
 }`;
 
@@ -173,7 +172,7 @@ export default function DocsPage() {
             </h1>
             <p className="font-comic-body text-base opacity-70 max-w-2xl">
               Free, unauthenticated API for domain search and intelligence.
-              Search across 8+ registrars for live pricing, or look up detailed RDAP/DNS info for any domain.
+              Search across 6 registrars for live pricing, or look up detailed RDAP/DNS info for any domain.
             </p>
           </div>
 
@@ -195,7 +194,7 @@ export default function DocsPage() {
                 <Badge color="green">GET</Badge>
                 <div>
                   <code className="text-sm font-bold">/api/search?q=&#123;keyword&#125;</code>
-                  <p className="font-comic-body text-sm opacity-70 mt-0.5">Search domain availability and compare prices across 8+ registrars.</p>
+                  <p className="font-comic-body text-sm opacity-70 mt-0.5">Search domain availability and compare prices across 6 registrars.</p>
                 </div>
               </a>
               <a
@@ -223,7 +222,7 @@ export default function DocsPage() {
                 <code className="text-base font-bold">/api/search?q=&#123;keyword&#125;</code>
               </div>
               <p className="opacity-70 text-sm">
-                Search domain availability across 8+ registrars with live pricing.
+                Search domain availability across 6 registrars with live pricing.
               </p>
             </div>
 
@@ -249,7 +248,7 @@ export default function DocsPage() {
                 <h3 className="font-comic-title text-lg">JSON Response</h3>
               </div>
               <p className="opacity-70 text-sm mb-4">
-                Waits for all registrars to respond, then returns a single JSON object. Takes 5-10 seconds. Best for scripts, bots, and backend integrations.
+                Waits for all registrars to respond, then returns a single JSON object. Takes 5-15 seconds. Best for scripts, bots, and backend integrations.
               </p>
 
               <CodeBlock title="curl">{`curl "https://donadomains.xyz/api/search?q=donadomains"`}</CodeBlock>
@@ -295,7 +294,7 @@ for domain in available:
                 <h3 className="font-comic-title text-lg">Streaming Response</h3>
               </div>
               <p className="opacity-70 text-sm mb-4">
-                Results arrive progressively via Server-Sent Events as each registrar completes. Each batch includes DNS-verified availability. Registrar results stream in over 2-8 seconds, followed by RDAP enrichment for taken domains. Best for building real-time UIs with progress indicators.
+                Results arrive progressively via Server-Sent Events as each registrar completes. Registrar results stream in over 2-15 seconds. Best for building real-time UIs with progress indicators.
               </p>
 
               <CodeBlock title="curl">{`curl -N "https://donadomains.xyz/api/search?q=donadomains&stream=true"`}</CodeBlock>
@@ -351,10 +350,8 @@ for line in res.iter_lines():
 
               <p className="font-comic-title text-sm mt-4 mb-2">Event Types</p>
               <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-                <FieldRow name="init" type="event" desc="Sent first. Contains the list of registrar names being scraped (e.g. Namecheap, GoDaddy, Spaceship, etc.)." />
-                <FieldRow name="batch" type="event" desc="Sent each time a registrar completes. Contains the full merged and DNS-verified results so far, plus source statuses." />
-                <FieldRow name="rdap_update" type="event" desc="Registration details (registrar, dates) for a taken domain." />
-                <FieldRow name="rdap_done" type="event" desc="All RDAP lookups finished." />
+                <FieldRow name="init" type="event" desc="Sent first. Contains the list of registrar names being scraped (Dynadot, Name.com, GoDaddy, Namecheap, Hover, Porkbun)." />
+                <FieldRow name="batch" type="event" desc="Sent each time a registrar completes. Contains the full merged results so far, plus source statuses." />
                 <FieldRow name="complete" type="event" desc="All sources finished. Stream closes after this." />
               </div>
             </div>
@@ -366,20 +363,19 @@ for line in res.iter_lines():
               <FieldRow name="available" type="boolean" desc="Whether the domain is available for registration" />
               <FieldRow name="tld" type="string" desc="TLD including dot (e.g. '.com')" />
               <FieldRow name="matchType" type="string" desc='"exact" if TLD matches user query, "similar" otherwise' optional />
-              <FieldRow name="buyLinks" type="BuyLink[]" desc="Purchase links from different registrars with pricing (available domains only)" optional />
+              <FieldRow name="buyLinks" type="BuyLink[]" desc="Purchase links from registrars with pricing (empty array for taken domains)" />
               <FieldRow name="registerUrl" type="string" desc="Direct URL to register at the cheapest registrar" optional />
-              <FieldRow name="registration" type="object" desc="Registration details for taken domains (registrar, dates)" optional />
             </div>
 
             <h3 className="font-comic-title text-xl mt-6 mb-2">BuyLink Fields</h3>
             <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <FieldRow name="name" type="string" desc="Registrar name" />
-              <FieldRow name="url" type="string" desc="Direct purchase URL" />
-              <FieldRow name="price" type="string" desc='Formatted price (e.g. "$1.08/yr")' optional />
-              <FieldRow name="priceNum" type="number" desc="Numeric price for sorting" optional />
-              <FieldRow name="renewalPrice" type="string" desc='Formatted renewal price (e.g. "$9.08/yr")' optional />
-              <FieldRow name="renewalPriceNum" type="number" desc="Numeric renewal price" optional />
+              <FieldRow name="name" type="string" desc="Registrar name (e.g. GoDaddy, Dynadot, Hover)" />
+              <FieldRow name="url" type="string" desc="Direct purchase URL — takes user to checkout" />
+              <FieldRow name="price" type="string" desc='Formatted price (e.g. "$9.99/yr")' optional />
+              <FieldRow name="priceNum" type="number" desc="Numeric price for sorting/comparison" optional />
               <FieldRow name="isCheapest" type="boolean" desc="True if this is the cheapest option across all registrars" optional />
+              <FieldRow name="premium" type="boolean" desc="True if this is a premium/aftermarket listing" optional />
+              <FieldRow name="source" type="string" desc='Always "scraped" — prices are live-scraped from registrar websites' />
             </div>
 
             <h3 className="font-comic-title text-xl mt-6 mb-2">Error Responses</h3>
@@ -499,7 +495,7 @@ print(intel["sources"])      # ["rdap", "dns"]` },
               </p>
               <ul className="list-disc list-inside space-y-1.5 opacity-80">
                 <li>Be reasonable with request volume</li>
-                <li>The search endpoint streams results and may take 5-10 seconds to complete</li>
+                <li>The search endpoint streams results and may take 5-15 seconds to complete</li>
                 <li>The domain info endpoint has a 10 second timeout</li>
                 <li>Registrar scraping is rate-limited upstream by the registrar sites themselves</li>
               </ul>

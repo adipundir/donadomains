@@ -59,6 +59,45 @@ export const watchTokens = pgTable(
   ],
 );
 
+// ─── Scrape Failures ─────────────────────────────────────────────────────────
+
+export const scrapeFailures = pgTable(
+  "scrape_failures",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    registrar: text("registrar").notNull(),
+    query: text("query").notNull(),
+    error: text("error").notNull(),
+    durationMs: integer("duration_ms").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("scrape_failures_registrar_idx").on(table.registrar),
+    index("scrape_failures_created_at_idx").on(table.createdAt),
+  ],
+);
+
+// ─── Search Logs ─────────────────────────────────────────────────────────────
+
+export const searchLogs = pgTable(
+  "search_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    query: text("query").notNull(),
+    totalResults: integer("total_results").notNull(),
+    totalDurationMs: integer("total_duration_ms").notNull(),
+    /** Per-registrar breakdown: [{name, status, hits, durationMs, error?}] */
+    registrarResults: jsonb("registrar_results")
+      .$type<Array<{ name: string; status: string; hits: number; durationMs: number; error?: string }>>()
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("search_logs_created_at_idx").on(table.createdAt),
+    index("search_logs_query_idx").on(table.query),
+  ],
+);
+
 // ─── Rate Limits ─────────────────────────────────────────────────────────────
 
 export const rateLimits = pgTable("rate_limits", {

@@ -6,8 +6,6 @@ import {
   buildSearchResults,
 } from "@/app/lib/domain-scraper";
 import type { SourceStatus } from "@/app/lib/domain-scraper";
-import { getDb } from "@/app/lib/db";
-import { scrapeFailures, searchLogs } from "@/app/lib/schema";
 
 const REGISTRAR_TIMEOUT_MS = 20_000;
 
@@ -16,8 +14,38 @@ export const runtime = "nodejs";
 
 /**
  * Registrar-only search: scrape registrars in parallel, compare prices, done.
- * No DNS verification or RDAP enrichment — registrars provide availability + pricing.
  */
+
+/** Fire-and-forget: log search + failures to DB after results are delivered. */
+function logToDb(
+  query: string,
+  totalResults: number,
+  totalDurationMs: number,
+  registrarResults: Array<{ name: string; status: string; hits: number; durationMs: number; error?: string }>,
+) {
+  // Dynamic import so the DB module is never loaded during the search hot path
+  import("@/app/lib/db").then(({ getDb }) =>
+    import("@/app/lib/schema").then(({ scrapeFailures, searchLogs }) => {
+      const db = getDb();
+
+      // Log overall search
+      db.insert(searchLogs)
+        .values({ query, totalResults, totalDurationMs, registrarResults })
+        .execute()
+        .catch(() => {});
+
+      // Log individual failures
+      for (const r of registrarResults) {
+        if (r.status === "failed" && r.error) {
+          db.insert(scrapeFailures)
+            .values({ registrar: r.name, query, error: r.error, durationMs: r.durationMs })
+            .execute()
+            .catch(() => {});
+        }
+      }
+    })
+  ).catch(() => {});
+}
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim() ?? "";
@@ -40,13 +68,11 @@ export async function GET(req: NextRequest) {
 
   console.log(`[Search] "${baseName}" (userTld=${userTld ?? "none"}, stream=${wantStream})`);
 
-  // ── Helpers ─────────────────────────────────────────────────────────────
-
   /** Run a single registrar scrape. */
   async function runRegistrar(
     registrar: (typeof ALL_REGISTRARS)[number],
     hits: Map<string, Map<string, RegistrarSearchHit>>,
-  ): Promise<SourceStatus> {
+  ): Promise<SourceStatus & { durationMs: number; error?: string }> {
     const t0 = Date.now();
     try {
       const result = await Promise.race([
@@ -56,13 +82,7 @@ export async function GET(req: NextRequest) {
         ),
       ]);
       const elapsed = Date.now() - t0;
-
-      if (result.error) {
-        console.log(`[Search] ${registrar.name}: ${result.hits.length} hits in ${elapsed}ms (error: ${result.error})`);
-        logScrapeFailure(registrar.name, baseName, result.error, elapsed);
-      } else {
-        console.log(`[Search] ${registrar.name}: ${result.hits.length} hits in ${elapsed}ms`);
-      }
+      console.log(`[Search] ${registrar.name}: ${result.hits.length} hits in ${elapsed}ms${result.error ? ` (error: ${result.error})` : ""}`);
 
       for (const hit of result.hits) {
         const d = hit.domain.toLowerCase();
@@ -71,43 +91,14 @@ export async function GET(req: NextRequest) {
       }
 
       if (result.hits.length === 0 && result.error) {
-        return { name: registrar.name, status: "failed", count: 0 };
+        return { name: registrar.name, status: "failed", count: 0, durationMs: elapsed, error: result.error };
       }
-      return { name: registrar.name, status: "ok", count: result.hits.length };
+      return { name: registrar.name, status: "ok", count: result.hits.length, durationMs: elapsed };
     } catch (err) {
       const elapsed = Date.now() - t0;
       const errorMsg = (err as Error).message;
       console.log(`[Search] ${registrar.name}: failed in ${elapsed}ms — ${errorMsg}`);
-      logScrapeFailure(registrar.name, baseName, errorMsg, elapsed);
-      return { name: registrar.name, status: "failed", count: 0 };
-    }
-  }
-
-  function logScrapeFailure(registrar: string, query: string, error: string, durationMs: number) {
-    try {
-      const db = getDb();
-      db.insert(scrapeFailures)
-        .values({ registrar, query, error, durationMs })
-        .execute()
-        .catch((e) => console.error(`[Search] Failed to log scrape failure:`, e));
-    } catch {
-      // DB not configured — skip logging
-    }
-  }
-
-  function logSearchRequest(
-    totalResults: number,
-    totalDurationMs: number,
-    registrarResults: Array<{ name: string; status: string; hits: number; durationMs: number; error?: string }>,
-  ) {
-    try {
-      const db = getDb();
-      db.insert(searchLogs)
-        .values({ query: baseName, totalResults, totalDurationMs, registrarResults })
-        .execute()
-        .catch((e) => console.error(`[Search] Failed to log search:`, e));
-    } catch {
-      // DB not configured — skip
+      return { name: registrar.name, status: "failed", count: 0, durationMs: elapsed, error: errorMsg };
     }
   }
 
@@ -139,11 +130,9 @@ export async function GET(req: NextRequest) {
           registrars: ALL_REGISTRARS.map((r) => r.name),
         });
 
-        // Registrar scrapes — each emits a batch as it completes
         const registrarPhases = ALL_REGISTRARS.map(async (registrar) => {
-          const t0 = Date.now();
           const status = await runRegistrar(registrar, domainPricingHits);
-          registrarTimings.push({ name: status.name, status: status.status, hits: status.count, durationMs: Date.now() - t0 });
+          registrarTimings.push({ name: status.name, status: status.status, hits: status.count, durationMs: status.durationMs, error: status.error });
           sourceStatuses.push(status);
 
           write({
@@ -158,13 +147,14 @@ export async function GET(req: NextRequest) {
         Promise.all(registrarPhases)
           .then(() => {
             write({ type: "complete" });
-            logSearchRequest(domainPricingHits.size, Date.now() - searchStart, registrarTimings);
             try { controller.close(); } catch {}
+            // Log after stream is closed — user already has results
+            logToDb(baseName, domainPricingHits.size, Date.now() - searchStart, registrarTimings);
           })
           .catch(() => {
             write({ type: "complete" });
-            logSearchRequest(domainPricingHits.size, Date.now() - searchStart, registrarTimings);
             try { controller.close(); } catch {}
+            logToDb(baseName, domainPricingHits.size, Date.now() - searchStart, registrarTimings);
           });
       },
     });
@@ -185,28 +175,29 @@ export async function GET(req: NextRequest) {
     const jsonSearchStart = Date.now();
     const domainPricingHits = new Map<string, Map<string, RegistrarSearchHit>>();
     const sourceStatuses: SourceStatus[] = [];
-    const jsonRegistrarTimings: Array<{ name: string; status: string; hits: number; durationMs: number; error?: string }> = [];
+    const registrarTimings: Array<{ name: string; status: string; hits: number; durationMs: number; error?: string }> = [];
 
-    // All registrar scrapes in parallel
     await Promise.all(
       ALL_REGISTRARS.map(async (registrar) => {
-        const t0 = Date.now();
         const status = await runRegistrar(registrar, domainPricingHits);
-        jsonRegistrarTimings.push({ name: status.name, status: status.status, hits: status.count, durationMs: Date.now() - t0 });
+        registrarTimings.push({ name: status.name, status: status.status, hits: status.count, durationMs: status.durationMs, error: status.error });
         sourceStatuses.push(status);
       }),
     );
 
     const results = buildSearchResults(domainPricingHits, baseName, userTld);
 
-    logSearchRequest(results.length, Date.now() - jsonSearchStart, jsonRegistrarTimings);
-
-    return NextResponse.json({
+    // Response goes out first, logging happens after
+    const response = NextResponse.json({
       keyword: baseName,
       tld: userTld ?? null,
       results,
       sources: sourceStatuses,
     });
+
+    logToDb(baseName, results.length, Date.now() - jsonSearchStart, registrarTimings);
+
+    return response;
   } catch (err) {
     console.error(`[API] /api/search error:`, err);
     return NextResponse.json(

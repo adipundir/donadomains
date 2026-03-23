@@ -1,6 +1,6 @@
 # Donadomains — Full API Reference
 
-> Domain search aggregator that compares prices across 8+ registrars and provides in-depth domain intelligence. Find the cheapest place to buy any domain, or look up who owns it.
+> Domain search aggregator that compares prices across 6 registrars in real-time. Find the cheapest place to buy any domain, or look up who owns it.
 
 Base URL: https://donadomains.xyz
 Docs: https://donadomains.xyz/docs
@@ -12,7 +12,7 @@ Auth: None required (free, unauthenticated)
 
 GET /api/search?q={keyword}
 
-Searches domain availability across 8+ registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Hostinger, Squarespace, Spaceship) in real-time. Returns live pricing with direct purchase links from each registrar, and automatically marks the cheapest option.
+Searches domain availability across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun) in real-time. Returns live pricing with direct purchase links from each registrar, and automatically marks the cheapest option.
 
 ### Parameters
 
@@ -23,7 +23,7 @@ Searches domain availability across 8+ registrars (GoDaddy, Namecheap, Dynadot, 
 
 ### JSON Response (default)
 
-Waits for all registrars to respond (typically 5-10 seconds), then returns a single JSON object.
+Waits for all registrars to respond (typically 5-15 seconds), then returns a single JSON object.
 
 ```
 GET /api/search?q=example
@@ -43,7 +43,7 @@ If the query includes a TLD (e.g. "example.io"), the `tld` field will be ".io" a
 
 ### Streaming Response (stream=true)
 
-Results arrive progressively via Server-Sent Events as each registrar completes.
+Results arrive progressively via Server-Sent Events as each registrar completes. This is the recommended mode — users see results within 2-5 seconds as fast registrars return first.
 
 ```
 GET /api/search?q=example&stream=true
@@ -53,8 +53,6 @@ Each SSE message has a `data:` prefix containing JSON. Event types:
 
 - `init` — Sent first. Contains `registrars` array listing names of registrars being queried.
 - `batch` — Sent each time a registrar completes. Contains `registrar` (name), `registrarStatus` ("ok" or "failed"), `results` (full merged results so far), `sourceStatuses` (all sources so far).
-- `rdap_update` — Sent for each taken domain with registration details. Contains `domain` and `registration` object.
-- `rdap_done` — Sent after all RDAP lookups finish.
 - `complete` — Final event. Stream closes after this.
 
 ### DomainResult
@@ -65,9 +63,8 @@ Each SSE message has a `data:` prefix containing JSON. Event types:
 | available    | boolean       | Whether the domain is available for registration |
 | tld          | string        | TLD including dot (e.g. ".com") |
 | matchType    | string?       | "exact" if the domain matches the keyword + a standard TLD, "similar" otherwise |
-| buyLinks     | BuyLink[]?    | Purchase links from registrars with pricing (available domains only) |
+| buyLinks     | BuyLink[]     | Purchase links from registrars with pricing (empty array for taken domains) |
 | registerUrl  | string?       | Direct URL to register at the cheapest registrar |
-| registration | object?       | Registration details for taken domains (see below) |
 
 ### BuyLink
 
@@ -75,20 +72,11 @@ Each SSE message has a `data:` prefix containing JSON. Event types:
 |-----------------|---------|-------------|
 | name            | string  | Registrar name (e.g. "GoDaddy", "Namecheap") |
 | url             | string  | Direct purchase URL — takes user to checkout |
-| price           | string? | Formatted price (e.g. "$1.08/yr") |
+| price           | string? | Formatted price (e.g. "$9.99/yr") |
 | priceNum        | number? | Numeric price for sorting/comparison |
-| renewalPrice    | string? | Formatted renewal price (e.g. "$9.08/yr") |
-| renewalPriceNum | number? | Numeric renewal price |
 | isCheapest      | boolean?| True if this is the cheapest option across all registrars |
-
-### Registration (for taken domains)
-
-| Field     | Type   | Description |
-|-----------|--------|-------------|
-| registrar | string?| Name of the registrar holding the domain |
-| created   | string?| Creation date (ISO 8601) |
-| expires   | string?| Expiration date (ISO 8601) |
-| status    | string[]?| ICANN status codes |
+| premium         | boolean?| True if this is a premium/aftermarket listing |
+| source          | string  | Always "scraped" |
 
 ### SourceStatus
 
@@ -137,6 +125,37 @@ for domain in available:
             print(f"Buy: {link['url']}")
 ```
 
+### Example: Streaming with JavaScript
+
+```javascript
+const response = await fetch("https://donadomains.xyz/api/search?q=myproject&stream=true");
+const reader = response.body.getReader();
+const decoder = new TextDecoder();
+let buffer = "";
+
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
+
+  buffer += decoder.decode(value, { stream: true });
+  const parts = buffer.split("\n\n");
+  buffer = parts.pop();
+
+  for (const part of parts) {
+    const line = part.split("\n").find(l => l.startsWith("data: "));
+    if (!line) continue;
+    const event = JSON.parse(line.slice(6));
+
+    if (event.type === "batch") {
+      console.log(`${event.registrar}: ${event.registrarStatus}`);
+      console.log(`${event.results.length} results so far`);
+    } else if (event.type === "complete") {
+      console.log("Search complete");
+    }
+  }
+}
+```
+
 ---
 
 ## Endpoint 2: Domain Info
@@ -165,7 +184,7 @@ Returns comprehensive domain intelligence for a single domain. Queries RDAP (reg
 | registrarUrl   | string?  | Registrar website URL |
 | registrant     | string?  | Name of the registrant (often redacted for privacy) |
 | organization   | string?  | Registrant organization |
-| contactEmail   | string?  | Registrant contact email (only shown when genuinely from registrant, not registrar abuse desk) |
+| contactEmail   | string?  | Registrant contact email (only shown when not privacy-protected) |
 | contactPhone   | string?  | Registrant contact phone |
 | contactAddress | string?  | Registrant address |
 | nameservers    | string[]?| Authoritative nameservers |
@@ -213,17 +232,15 @@ else:
 
 ## How It Works
 
-1. **Registrar Discovery**: When you search, we scrape 8+ registrar search pages in parallel. Each registrar returns domains across the TLDs they support — no hardcoded list.
+1. **Registrar Discovery**: When you search, we scrape 6 registrar search pages in parallel via Firecrawl. Each registrar returns domains across the TLDs they support — no hardcoded list.
 
-2. **DNS Verification**: We DNS-check every domain the registrars return using Cloudflare DNS-over-HTTPS. This gives authoritative available/taken status (registrars sometimes disagree).
+2. **Price Aggregation**: For available domains, we merge pricing from all registrars and mark the cheapest option with `isCheapest: true`.
 
-3. **Price Aggregation**: For available domains, we merge pricing from all registrars and mark the cheapest option with `isCheapest: true`.
-
-4. **RDAP Enrichment**: For taken domains, we fetch registration details (registrar, owner, expiry, nameservers) from RDAP — the modern, HTTP-based replacement for WHOIS.
+3. **Streaming**: Results stream to the client via SSE as each registrar completes. Fast registrars (Dynadot, Name.com) return in ~2-5s; slower ones (GoDaddy, Porkbun) may take 10-15s.
 
 ## Notes
 
 - No authentication required
-- Response time: ~5-10 seconds for search (registrar scraping is the bottleneck), ~1-2 seconds for domain info
+- Response time: ~5-15 seconds for search (registrar scraping is the bottleneck), ~1-2 seconds for domain info
 - Prices are live — scraped from registrar websites in real-time, not cached
 - Privacy: owner contact details only shown when the registrant hasn't opted into privacy protection

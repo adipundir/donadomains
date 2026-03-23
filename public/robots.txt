@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Allow: /docs
+Allow: /api/
+
+Sitemap: https://donadomains.xyz/sitemap.xml

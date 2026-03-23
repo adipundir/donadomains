@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Donadomains",
+  "name_for_model": "donadomains",
+  "description_for_human": "Search domain availability and compare prices across 6 registrars. Get detailed domain intelligence.",
+  "description_for_model": "Search for domain name availability across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun) with live pricing. Find the cheapest registrar for any domain. Also look up detailed domain intelligence (RDAP, DNS) for any registered domain.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://donadomains.xyz/openapi.json"
+  },
+  "logo_url": "https://donadomains.xyz/globe.svg",
+  "contact_email": "adi@donadomains.xyz",
+  "legal_info_url": "https://donadomains.xyz/docs"
+}

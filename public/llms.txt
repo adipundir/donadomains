@@ -1,54 +1,55 @@
 # Donadomains
 
-> Domain search aggregator that compares prices across 8+ registrars and provides in-depth domain intelligence. Find the cheapest place to buy any domain, or look up who owns it.
+> Domain search aggregator that compares prices across 6 registrars in real-time. Find the cheapest place to buy any domain, or look up who owns it.
 
 Base URL: https://donadomains.xyz
 
 ## What We Do
 
-Donadomains searches domain availability across multiple registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, and more) in real-time. We return:
+Donadomains searches domain availability across multiple registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun) in real-time. We return:
 
 - Availability status for any keyword across all common TLDs
 - Live pricing from each registrar with direct buy links
 - The cheapest registrar highlighted automatically
-- Registration details for taken domains (registrar, owner, expiry, nameservers)
 
 ## API — 2 Endpoints
+
+No authentication required. Free and open.
 
 ### 1. Domain Search
 
 GET /api/search?q={keyword}
 
-Search for domain availability and compare prices. Returns a JSON response with results from 8+ registrars.
+Search for domain availability and compare prices. Returns a JSON response with results from 6 registrars.
 
 Parameters:
 - q (required): Search keyword like "example" or full domain like "example.com"
 - stream (optional): Set to "true" for Server-Sent Events streaming
 
-Example: GET /api/search?q=donadomains
+Example: GET /api/search?q=myproject
 
 Response:
 {
-  "keyword": "donadomains",
+  "keyword": "myproject",
   "tld": null,
   "results": [
     {
-      "domain": "donadomains.com",
+      "domain": "myproject.com",
       "available": true,
       "tld": ".com",
       "matchType": "exact",
       "buyLinks": [
-        { "name": "GoDaddy", "url": "https://...", "price": "$0.01/yr", "priceNum": 0.01, "isCheapest": true },
-        { "name": "Namecheap", "url": "https://...", "price": "$5.98/yr", "priceNum": 5.98 }
+        { "name": "GoDaddy", "url": "https://...", "price": "$0.01/yr", "priceNum": 0.01, "isCheapest": true, "source": "scraped" },
+        { "name": "Namecheap", "url": "https://...", "price": "$5.98/yr", "priceNum": 5.98, "source": "scraped" }
       ],
       "registerUrl": "https://..."
     },
     {
-      "domain": "donadomains.xyz",
+      "domain": "myproject.xyz",
       "available": false,
       "tld": ".xyz",
       "matchType": "exact",
-      "registration": { "registrar": "Go Daddy, LLC", "created": "2026-02-14", "expires": "2027-02-14" }
+      "buyLinks": []
     }
   ],
   "sources": [
