@@ -26,8 +26,7 @@ async function main() {
   console.log(`\n── Buy links (scraped) ──`);
   for (const link of first.buyLinks ?? []) {
     const cheapest = link.isCheapest ? " ★ CHEAPEST" : "";
-    const renewal = link.renewalPrice ? ` (renew: ${link.renewalPrice})` : "";
-    console.log(`  ${link.name.padEnd(12)} ${(link.price ?? "N/A").padEnd(12)}${renewal}${cheapest}`);
+    console.log(`  ${link.name.padEnd(12)} ${(link.price ?? "N/A").padEnd(12)}${cheapest}`);
   }
 
   console.log("\n========== Done ==========\n");

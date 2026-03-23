@@ -43,10 +43,7 @@ export async function firecrawlScrape(
     const doc = await fc.scrape(url, {
       formats: ["markdown"],
       waitFor: waitMs,
-      timeout: 30000,
-      headers: {
-        "Accept-Language": "en-US,en;q=0.9",
-      },
+      timeout: 20000,
     });
     return {
       success: true,
@@ -57,5 +54,3 @@ export async function firecrawlScrape(
     return { success: false, error: (err as Error).message };
   }
 }
-
-

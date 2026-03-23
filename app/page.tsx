@@ -65,23 +65,6 @@ function formatStatus(status?: string[]): string {
   return status.map((s) => STATUS_LABELS[s] || s).join(", ");
 }
 
-/** 5-year total cost: registration + 4 × renewal. Only shown when renewal price is known. */
-function fiveYearCost(link: BuyLink): number | null {
-  if (link.priceNum == null || link.renewalPriceNum == null) return null;
-  return link.priceNum + 4 * link.renewalPriceNum;
-}
-
-function cheapest5yr(links?: BuyLink[]): { cost: number; name: string } | null {
-  if (!links?.length) return null;
-  let best: { cost: number; name: string } | null = null;
-  for (const l of links) {
-    const c = fiveYearCost(l);
-    if (c != null && (best === null || c < best.cost)) {
-      best = { cost: c, name: l.name };
-    }
-  }
-  return best;
-}
 
 function SearchIcon({ className }: { className?: string }) {
   return (
@@ -440,7 +423,6 @@ function SearchProgress({
 
   const names = Object.keys(statuses);
   const total = names.length;
-  // failed counts as done for the progress bar — no red crosses shown
   const doneCount = names.filter((n) => statuses[n] !== "loading").length;
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
   const allDone = doneCount === total && total > 0;
@@ -448,12 +430,26 @@ function SearchProgress({
   return (
     <div className="mb-6 animate-fadeInUp">
       <div className="flex items-center justify-between mb-2">
-        <span className="font-comic-title text-[10px] uppercase tracking-widest opacity-40">
-          {allDone
-            ? `${total} sources checked`
-            : `Checking ${total} sources — ${doneCount}/${total}`}
-        </span>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          {names.map((name) => {
+            const s = statuses[name];
+            return (
+              <span
+                key={name}
+                className={`font-comic-title text-[10px] uppercase tracking-wide transition-opacity ${
+                  s === "done"
+                    ? "opacity-60"
+                    : s === "failed"
+                    ? "opacity-30 line-through"
+                    : "opacity-40 loading-ellipsis"
+                }`}
+              >
+                {s === "done" ? "✓" : s === "failed" ? "✗" : "…"} {name}
+              </span>
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-3 shrink-0">
           {resultCount > 0 && (
             <span className="font-comic-body text-[10px] opacity-40">
               {resultCount} result{resultCount !== 1 ? "s" : ""}
@@ -466,7 +462,7 @@ function SearchProgress({
       </div>
       <div className="w-full h-[3px] bg-[var(--border-light)] overflow-hidden">
         <div
-          className="h-full bg-[var(--foreground)] transition-all duration-500 ease-out"
+          className={`h-full transition-all duration-500 ease-out ${allDone ? "bg-[var(--foreground)]" : "bg-[var(--foreground)]/60"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -478,7 +474,6 @@ export default function Home() {
   const [keyword, setKeyword] = useState("");
   const [results, setResults] = useState<DomainResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [rdapDone, setRdapDone] = useState(false);
   const [loadingStart, setLoadingStart] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [searchedKeyword, setSearchedKeyword] = useState<string | null>(null);
@@ -509,7 +504,6 @@ export default function Home() {
     searchAbortRef.current = abort;
 
     setLoading(true);
-    setRdapDone(false);
     setLoadingStart(Date.now());
     setError(null);
     setResults([]);
@@ -548,7 +542,7 @@ export default function Home() {
           const line = part.split("\n").find((l) => l.startsWith("data: "));
           if (!line) continue;
 
-          let event: { type: string; registrars?: string[]; registrar?: string; registrarStatus?: string; results?: DomainResult[]; domain?: string; registration?: DomainRegistrationDetails; };
+          let event: { type: string; registrars?: string[]; registrar?: string; registrarStatus?: string; results?: DomainResult[]; };
           try { event = JSON.parse(line.slice(6)); } catch { continue; }
 
           console.log(`[Search] SSE event: type=${event.type}`, event.type === "batch"
@@ -568,16 +562,6 @@ export default function Home() {
           } else if (event.type === "complete") {
             console.log("[Search] Complete event received, stopping loading");
             setLoading(false);
-          } else if (event.type === "rdap_done") {
-            setRdapDone(true);
-          } else if (event.type === "rdap_update" && event.domain && event.registration) {
-            setResults((prev) =>
-              prev.map((r) =>
-                r.domain === (event as { domain: string }).domain
-                  ? { ...r, registration: (event as { registration: unknown }).registration as typeof r.registration }
-                  : r
-              )
-            );
           }
         }
       }
@@ -675,54 +659,26 @@ export default function Home() {
       {result.available && result.buyLinks && result.buyLinks.length > 0 ? (
         <div className="mt-3 sm:mt-4 pt-3 border-t border-[var(--border-light)]">
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
-            {result.buyLinks.map((link) => {
-              const total5yr = fiveYearCost(link);
-              return (
-                <a
-                  key={link.name}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`inline-flex flex-col items-start px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-bold transition-all ${link.premium
-                    ? "border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/30 hover:border-amber-600"
-                    : link.isCheapest
-                    ? "bg-[var(--foreground)] text-[var(--background)] border-2 border-[var(--foreground)] shadow-[2px_2px_0px_var(--accent)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px]"
-                    : "border border-[var(--border-light)] hover:border-[var(--border)] bg-[var(--surface)]"
-                    }`}
-                >
-                  <span className="inline-flex items-center gap-1 sm:gap-1.5">
-                    {link.premium && <span className="font-comic-title text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400">Premium</span>}
-                    {link.promo && !link.premium && <span className="font-comic-title text-[10px] uppercase tracking-wider text-orange-500">1st yr</span>}
-                    <span className="font-comic-title uppercase tracking-wide">{link.name}</span>
-                    {link.price && <span className={link.isCheapest && !link.premium ? "font-comic-title" : ""}>{link.price}</span>}
-                    {link.isCheapest && !link.premium && <StarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[var(--accent)]" />}
-                    {link.cheapestLongTerm && !link.isCheapest && <span className="text-[9px] font-comic-title uppercase text-[var(--green)]">best value</span>}
-                  </span>
-                  {link.renewalPrice && (
-                    <span className={`text-[10px] ${link.promo ? "text-red-500 font-bold" : link.renewalPriceNum != null && link.priceNum != null && link.renewalPriceNum >= link.priceNum * 2 ? "text-red-500 font-bold" : link.isCheapest ? "opacity-70" : "opacity-50"}`}>
-                      {link.promo ? `then ${link.renewalPrice}` : `renews ${link.renewalPrice}`}
-                    </span>
-                  )}
-                  {total5yr != null && (
-                    <span className={`text-[10px] ${link.isCheapest ? "opacity-70" : "opacity-50"}`}>5yr: ${total5yr.toFixed(2)}</span>
-                  )}
-                </a>
-              );
-            })}
+            {result.buyLinks.map((link) => (
+              <a
+                key={link.name}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-bold transition-all ${link.premium
+                  ? "border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/30 hover:border-amber-600"
+                  : link.isCheapest
+                  ? "bg-[var(--foreground)] text-[var(--background)] border-2 border-[var(--foreground)] shadow-[2px_2px_0px_var(--accent)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px]"
+                  : "border border-[var(--border-light)] hover:border-[var(--border)] bg-[var(--surface)]"
+                  }`}
+              >
+                {link.premium && <span className="font-comic-title text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400">Premium</span>}
+                <span className="font-comic-title uppercase tracking-wide">{link.name}</span>
+                {link.price && <span className={link.isCheapest && !link.premium ? "font-comic-title" : ""}>{link.price}</span>}
+                {link.isCheapest && !link.premium && <StarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[var(--accent)]" />}
+              </a>
+            ))}
           </div>
-          {(() => {
-            const best5 = cheapest5yr(result.buyLinks);
-            const cheapestReg = result.buyLinks.find((l) => l.isCheapest);
-            // Only show if cheapest 5yr differs from cheapest registration price
-            if (best5 && cheapestReg && best5.name !== cheapestReg.name) {
-              return (
-                <p className="mt-2 font-comic-body text-xs opacity-60">
-                  Cheapest 5yr: <span className="font-bold">${best5.cost.toFixed(2)}</span> at <span className="font-bold">{best5.name}</span>
-                </p>
-              );
-            }
-            return null;
-          })()}
         </div>
       ) : result.available && loading ? (
         <div className="mt-3 sm:mt-4 pt-3 border-t border-[var(--border-light)]">
@@ -734,40 +690,10 @@ export default function Home() {
         </div>
       ) : null}
 
-      {/* RDAP info for taken domains — single row */}
+      {/* Taken domain note */}
       {!result.available && (
         <div className="mt-3 pt-3 border-t border-[var(--border-light)]">
-          {result.registration?.registrar || result.registration?.expires || result.registration?.created || result.registration?.registrant ? (
-            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
-              {result.registration?.registrar && (
-                <p><span className="font-comic-title text-xs uppercase tracking-wide opacity-60 mr-1.5">Registrar</span><span className="text-sm font-bold">{result.registration.registrar}</span></p>
-              )}
-              {result.registration?.registrant && (
-                <p className="max-w-[220px] truncate"><span className="font-comic-title text-xs uppercase tracking-wide opacity-60 mr-1.5">Owner</span><span className="text-sm font-bold" title={result.registration.registrant}>{result.registration.registrant}</span></p>
-              )}
-              {result.registration?.created && (
-                <p><span className="font-comic-title text-xs uppercase tracking-wide opacity-60 mr-1.5">Registered</span><span className="text-sm font-bold">{formatDate(result.registration.created)}</span></p>
-              )}
-              {result.registration?.expires && (() => {
-                const days = daysUntil(result.registration.expires);
-                return (
-                  <p>
-                    <span className="font-comic-title text-xs uppercase tracking-wide opacity-60 mr-1.5">Expires</span>
-                    <span className="text-sm font-bold">{formatDate(result.registration.expires)}</span>
-                    {days !== null && (
-                      <span className={`ml-1.5 text-xs font-bold ${days <= 30 ? "text-red-500" : days <= 90 ? "text-orange-500" : "opacity-60"}`}>
-                        ({days <= 0 ? "expired" : `${days}d left`})
-                      </span>
-                    )}
-                  </p>
-                );
-              })()}
-            </div>
-          ) : !rdapDone ? (
-            <p className="font-comic-title text-xs uppercase tracking-widest opacity-60 loading-ellipsis">Fetching details</p>
-          ) : (
-            <p className="font-comic-body text-sm opacity-60">Registration details unavailable — often privacy protected</p>
-          )}
+          <p className="font-comic-body text-sm opacity-60">This domain is taken.</p>
         </div>
       )}
     </div>
@@ -801,39 +727,10 @@ export default function Home() {
           {result.available && cheapest ? (
             <span className="font-comic-body text-sm font-bold">
               from <span className="text-[var(--green)]">{cheapest.price}</span>
-              {cheapest.renewalPrice && (
-                <span className={`ml-1 text-xs ${cheapest.renewalPriceNum != null && cheapest.priceNum != null && cheapest.renewalPriceNum >= cheapest.priceNum * 2 ? "text-red-500" : "opacity-40"}`}>
-                  &rarr; {cheapest.renewalPrice}
-                </span>
-              )}
               <span className="opacity-40 ml-1">· {cheapest.name}</span>
-              {(() => {
-                const best5 = cheapest5yr(result.buyLinks);
-                if (best5) {
-                  return (
-                    <span className="opacity-40 ml-2 text-xs">
-                      · 5yr: ${best5.cost.toFixed(2)}{best5.name !== cheapest.name ? ` (${best5.name})` : ""}
-                    </span>
-                  );
-                }
-                return null;
-              })()}
             </span>
           ) : !result.available ? (
-            result.registration ? (
-              <div className="font-comic-body text-xs opacity-70 space-y-0.5">
-                <span className="flex flex-wrap gap-x-2 gap-y-0.5">
-                  {result.registration.registrar && <span>{result.registration.registrar}</span>}
-                  {result.registration.created && <span>reg {formatDate(result.registration.created)}</span>}
-                  {result.registration.expires && <span>exp {formatDate(result.registration.expires)}</span>}
-                </span>
-                {result.registration.registrant && (
-                  <span className="block truncate" title={result.registration.registrant}>Owner: {result.registration.registrant}</span>
-                )}
-              </div>
-            ) : (
-              <span className="font-comic-body text-xs opacity-50 italic">Details unavailable (often privacy protected)</span>
-            )
+            <span className="font-comic-body text-xs opacity-50 italic">Taken</span>
           ) : null}
         </div>
 
@@ -855,16 +752,9 @@ export default function Home() {
                     }`}
                 >
                   {link.premium && <span className="font-comic-title text-[9px] uppercase tracking-wider text-amber-600 dark:text-amber-400">Premium</span>}
-                  {link.promo && !link.premium && <span className="font-comic-title text-[9px] uppercase tracking-wider text-orange-500">1st yr</span>}
                   <span className="font-comic-title uppercase tracking-wide">{link.name}</span>
                   {link.price && <span className="opacity-70">{link.price}</span>}
-                  {link.renewalPrice && (
-                    <span className={`text-[10px] ${link.promo ? "text-red-500 font-bold" : link.renewalPriceNum != null && link.priceNum != null && link.renewalPriceNum >= link.priceNum * 2 ? "text-red-500 font-bold" : "opacity-50"}`}>
-                      {link.promo ? `then ${link.renewalPrice}` : `→ ${link.renewalPrice}`}
-                    </span>
-                  )}
                   {link.isCheapest && !link.premium && <StarIcon className="w-3 h-3 text-[var(--accent)]" />}
-                  {link.cheapestLongTerm && !link.isCheapest && <span className="text-[8px] font-comic-title uppercase text-[var(--green)]">best value</span>}
                 </a>
               ))}
               {result.buyLinks.length > 3 && (

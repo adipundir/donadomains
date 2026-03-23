@@ -6,7 +6,10 @@ const PREMIUM_LABEL_RE = /\bpremium\b/i;
 const PREMIUM_DISCLAIMER_RE = /non[- ]?premium|not applicable to premium|premium domains only|premium names|auctionspremium|premiumgenerator/i;
 const TAKEN_RE = /taken|unavailable|registered|not available|sorry/i;
 const PREMIUM_PRICE_THRESHOLD = 500;
-const CONTEXT_LINES = 4;
+/** Number of non-empty lines to collect around a domain mention for context. */
+const CONTEXT_NON_EMPTY = 6;
+/** Hard cap on how far ahead to look (in raw lines, including blanks). */
+const CONTEXT_MAX_RAW = 12;
 
 const DOMAIN_RE =
   /([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.(?:[a-z]{2,}\.)?[a-z]{2,})\b/gi;
@@ -16,7 +19,7 @@ const INFRA_DOMAINS = new Set([
   "godaddy.com", "porkbun.com", "namecheap.com", "spaceship.com",
   "cloudflare.com", "wsimg.com", "img6.wsimg.com",
   "dynadot.com", "name.com", "hover.com", "hostinger.com", "squarespace.com",
-  "domainagents.com",
+  "domainagents.com", "exactmatchblock.available",
 ]);
 
 /**
@@ -34,22 +37,17 @@ const PROMO_PRICE_PATTERNS: RegExp[] = [
   /\bSALE\s*\$[\d,.]+/gi,            // "SALE$8.99" or "SALE $8.99"
 ];
 
-/** Only accept USD prices — drop non-USD currencies entirely. */
-function isUsdCurrency(symbol: string): boolean {
-  return symbol.trim() === "$";
-}
-
-/** Price with a yearly indicator — high confidence it's a registration price. */
+/** Price with a yearly indicator — high confidence it's a registration price. USD only. */
 const YEARLY_PRICE_RE = new RegExp(
-  `(?:\\$|€|£|EUR\\s*|GBP\\s*)(\\s*[\\d,]+(?:\\.\\d{1,2})?)\\s*[\\/\\s]*(?:yr|year|per\\s+year|annually|\\/\\s*1\\s*yr)`,
+  `\\$(\\s*[\\d,]+(?:\\.\\d{1,2})?)\\s*[\\/\\s]*(?:yr|year|per\\s+year|annually|\\/\\s*1\\s*yr)`,
   "i",
 );
-/** Bare currency amount — lower confidence. */
-const BARE_PRICE_RE = /(?:\$|€|£|EUR\s*|GBP\s*)(\s*[\d,]+(?:\.\d{1,2})?)/i;
+/** Bare USD amount — lower confidence. */
+const BARE_PRICE_RE = /\$(\s*[\d,]+(?:\.\d{1,2})?)/i;
 /** Monthly price — used to reject per-month amounts. */
-const MONTHLY_PRICE_RE = /(?:\$|€|£|EUR\s*|GBP\s*)\s*[\d,]+(?:\.\d{1,2})?\s*\/\s*(?:mo(?:nth)?)\b/i;
-/** Renewal price. */
-const RENEWAL_RE = /renew(?:s|al)?(?:\s+(?:at|price))?\s*[^$€£]{0,20}(?:\$|€|£|EUR\s*|GBP\s*)\s*([\d,]+(?:\.\d{1,2})?)/i;
+const MONTHLY_PRICE_RE = /\$\s*[\d,]+(?:\.\d{1,2})?\s*\/\s*(?:mo(?:nth)?)\b/i;
+/** Renewal price — USD only. */
+const RENEWAL_RE = /renew(?:s|al)?(?:\s+(?:at|price))?\s*[^$]{0,20}\$\s*([\d,]+(?:\.\d{1,2})?)/i;
 
 /** Remove markdown bold/italic/strikethrough markers so `**$21.07**` becomes `$21.07`. */
 function stripMarkdownFormatting(text: string): string {
@@ -71,26 +69,23 @@ function stripPromoPrices(text: string): string {
 }
 
 function extractPrice(text: string): number | undefined {
-  // Reject monthly prices (e.g. "$3,021.67/mo")
+  // Strip monthly prices first so they don't contaminate extraction
   if (MONTHLY_PRICE_RE.test(text)) {
     const withoutMonthly = text.replace(
-      /(?:\$|€|£|EUR\s*|GBP\s*)\s*[\d,]+(?:\.\d{1,2})?\s*\/\s*(?:mo(?:nth)?)\b[^$€£]*/gi,
+      /\$\s*[\d,]+(?:\.\d{1,2})?\s*\/\s*(?:mo(?:nth)?)\b[^$]*/gi,
       "",
     );
     if (!withoutMonthly.match(BARE_PRICE_RE)) return undefined;
     return extractPrice(withoutMonthly);
   }
 
+  // Prefer yearly-indicated prices (high confidence) over bare amounts
   const yearly = text.match(YEARLY_PRICE_RE);
   const bare = text.match(BARE_PRICE_RE);
   const match = yearly || bare;
   if (!match) return undefined;
   const val = parseFloat(match[1].replace(/,/g, "").trim());
-  if (isNaN(val)) return undefined;
-
-  // Only accept USD prices — reject EUR, GBP, etc.
-  const symMatch = match[0].match(/^(\$|€|£|EUR\s*|GBP\s*)/i);
-  if (symMatch && !isUsdCurrency(symMatch[1])) return undefined;
+  if (isNaN(val) || val <= 0) return undefined;
   return Math.round(val * 100) / 100;
 }
 
@@ -118,9 +113,18 @@ export function parseSearchMarkdown(
 
     const domainMatches = [...line.matchAll(DOMAIN_RE)];
     if (domainMatches.length === 0) continue;
+    // Skip lines with many domain-like matches — likely TLD selector lists, not results
+    if (domainMatches.length > 10) continue;
 
-    const ctxEnd = Math.min(lines.length, i + CONTEXT_LINES + 1);
-    const rawContext = lines.slice(i, ctxEnd).join("\n");
+    // Collect context lines, skipping blanks so whitespace-heavy pages
+    // (e.g. GoDaddy) don't push prices out of the window.
+    const ctxParts: string[] = [line];
+    let nonEmpty = 1;
+    for (let j = i + 1; j < lines.length && j <= i + CONTEXT_MAX_RAW && nonEmpty < CONTEXT_NON_EMPTY; j++) {
+      ctxParts.push(lines[j]);
+      if (lines[j].trim().length > 0) nonEmpty++;
+    }
+    const rawContext = ctxParts.join("\n");
     const ctxLower = rawContext.toLowerCase();
 
     const isTaken = TAKEN_RE.test(ctxLower);
@@ -249,20 +253,46 @@ export async function searchRegistrarPage(
 ): Promise<{ hits: RegistrarSearchHit[]; fetchTimeMs: number; error?: string }> {
   const start = Date.now();
 
+  console.log(`[${registrarName}] Scraping: ${url} (waitFor=${waitMs}ms)`);
+
   try {
     const result = await firecrawlScrape(url, waitMs);
     const elapsed = Date.now() - start;
 
     if (!result.success || !result.markdown) {
+      console.log(`[${registrarName}] FAILED in ${elapsed}ms — ${result.error ?? "no markdown"}`);
       return { hits: [], fetchTimeMs: elapsed, error: result.error };
     }
 
+    const lines = result.markdown.split("\n").filter(l => l.trim()).length;
+    console.log(`[${registrarName}] Got ${lines} non-empty lines in ${elapsed}ms`);
+
     if (DEBUG_SCRAPE) logRawMarkdown(registrarName, result.markdown);
     const hits = parseSearchMarkdown(result.markdown, buildBuyUrl);
+
+    const available = hits.filter(h => h.available && !h.premium);
+    const taken = hits.filter(h => !h.available && !h.premium);
+    const premium = hits.filter(h => h.premium);
+    console.log(`[${registrarName}] Parsed: ${hits.length} total — ${available.length} available, ${taken.length} taken, ${premium.length} premium`);
+
+    if (available.length > 0) {
+      const sample = available.slice(0, 3).map(h => `${h.domain} ($${h.registration ?? "?"})`).join(", ");
+      console.log(`[${registrarName}] Sample available: ${sample}`);
+    }
+    if (hits.length === 0 && lines > 0) {
+      // Log first 10 non-empty lines to debug why parsing found nothing
+      const preview = result.markdown.split("\n").filter(l => l.trim()).slice(0, 10);
+      console.log(`[${registrarName}] No hits from ${lines} lines. Preview:`);
+      for (const line of preview) {
+        console.log(`[${registrarName}]   ${line.slice(0, 120)}`);
+      }
+    }
+
     if (DEBUG_SCRAPE) logSearchHits(registrarName, hits);
     return { hits, fetchTimeMs: elapsed };
   } catch (err) {
     const elapsed = Date.now() - start;
+    console.log(`[${registrarName}] EXCEPTION in ${elapsed}ms — ${(err as Error).message}`);
     return { hits: [], fetchTimeMs: elapsed, error: (err as Error).message };
   }
 }

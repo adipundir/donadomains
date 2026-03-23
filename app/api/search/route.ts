@@ -4,25 +4,19 @@ import type { RegistrarSearchHit } from "@/app/lib/registrars";
 import {
   parseKeyword,
   buildSearchResults,
-  fetchRdapDetails,
 } from "@/app/lib/domain-scraper";
 import type { SourceStatus } from "@/app/lib/domain-scraper";
-import { probeDns } from "@/app/lib/domain-intel";
+import { getDb } from "@/app/lib/db";
+import { scrapeFailures, searchLogs } from "@/app/lib/schema";
 
-const REGISTRAR_TIMEOUT_MS = 15_000;
-const DNS_TIMEOUT_MS = 3_000;
-const RDAP_TIMEOUT_MS = 4_000;
-const MAX_RDAP_TAKEN = 8;
+const REGISTRAR_TIMEOUT_MS = 20_000;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
- * New architecture: registrars drive discovery, DNS verifies, RDAP enriches.
- *
- * 1. Registrar scrapes (parallel, 2-8s) — discover domains + pricing
- * 2. DNS verification (parallel, ~200ms) — confirm available/taken for registrar-returned domains
- * 3. RDAP enrichment (parallel, ~300ms) — registration details for taken domains
+ * Registrar-only search: scrape registrars in parallel, compare prices, done.
+ * No DNS verification or RDAP enrichment — registrars provide availability + pricing.
  */
 
 export async function GET(req: NextRequest) {
@@ -46,60 +40,7 @@ export async function GET(req: NextRequest) {
 
   console.log(`[Search] "${baseName}" (userTld=${userTld ?? "none"}, stream=${wantStream})`);
 
-  // ── Shared helpers ─────────────────────────────────────────────────────
-
-  /** Pre-filter domains worth DNS-checking (skip niche TLDs from a single registrar). */
-  function filterDomainsForDns(
-    domains: string[],
-    hits: Map<string, Map<string, RegistrarSearchHit>>,
-  ): string[] {
-    return domains.filter((domain) => {
-      // Always check the user's exact domain
-      if (userTld && domain === `${baseName}${userTld}`) return true;
-      // Skip domains that don't contain the keyword
-      if (!domain.includes(baseName)) return false;
-      // Keep domains that 2+ registrars returned (cross-validated)
-      const registrarCount = hits.get(domain)?.size ?? 0;
-      if (registrarCount >= 2) return true;
-      // For single-registrar domains, only keep popular TLDs
-      const tld = "." + domain.split(".").slice(1).join(".");
-      const popularTlds = new Set([
-        ".com", ".net", ".org", ".io", ".co", ".dev", ".app", ".ai",
-        ".xyz", ".me", ".info", ".biz", ".us", ".tv", ".online", ".site",
-        ".tech", ".store", ".club", ".world", ".live", ".shop", ".blog",
-        ".pro", ".vip", ".cloud", ".art", ".space", ".fun", ".host",
-        ".email", ".life", ".network", ".business", ".website", ".page", ".solutions",
-      ]);
-      return popularTlds.has(tld);
-    });
-  }
-
-  /** DNS-verify a set of domains returned by registrars. */
-  async function dnsVerify(domains: string[]) {
-    const availability = new Map<string, boolean>();
-    const probes = await Promise.all(
-      domains.map(async (domain) => {
-        try {
-          const probe = await Promise.race([
-            probeDns(domain),
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("dns-timeout")), DNS_TIMEOUT_MS),
-            ),
-          ]);
-          return { domain, available: !probe.resolves };
-        } catch {
-          return { domain, available: null as boolean | null };
-        }
-      }),
-    );
-
-    for (const { domain, available } of probes) {
-      if (available !== null) availability.set(domain, available);
-    }
-
-    console.log(`[Search] DNS verified ${availability.size} domains`);
-    return availability;
-  }
+  // ── Helpers ─────────────────────────────────────────────────────────────
 
   /** Run a single registrar scrape. */
   async function runRegistrar(
@@ -114,36 +55,60 @@ export async function GET(req: NextRequest) {
           setTimeout(() => reject(new Error("timeout")), REGISTRAR_TIMEOUT_MS),
         ),
       ]);
-      console.log(`[Search] ${registrar.name}: ${result.hits.length} hits in ${Date.now() - t0}ms`);
+      const elapsed = Date.now() - t0;
+
+      if (result.error) {
+        console.log(`[Search] ${registrar.name}: ${result.hits.length} hits in ${elapsed}ms (error: ${result.error})`);
+        logScrapeFailure(registrar.name, baseName, result.error, elapsed);
+      } else {
+        console.log(`[Search] ${registrar.name}: ${result.hits.length} hits in ${elapsed}ms`);
+      }
+
       for (const hit of result.hits) {
         const d = hit.domain.toLowerCase();
         if (!hits.has(d)) hits.set(d, new Map());
         hits.get(d)!.set(registrar.name, hit);
       }
+
+      if (result.hits.length === 0 && result.error) {
+        return { name: registrar.name, status: "failed", count: 0 };
+      }
       return { name: registrar.name, status: "ok", count: result.hits.length };
     } catch (err) {
-      console.log(`[Search] ${registrar.name}: failed in ${Date.now() - t0}ms — ${(err as Error).message}`);
+      const elapsed = Date.now() - t0;
+      const errorMsg = (err as Error).message;
+      console.log(`[Search] ${registrar.name}: failed in ${elapsed}ms — ${errorMsg}`);
+      logScrapeFailure(registrar.name, baseName, errorMsg, elapsed);
       return { name: registrar.name, status: "failed", count: 0 };
     }
   }
 
-  /** Fetch RDAP for taken domains. */
-  async function runRdap(takenDomains: string[]) {
-    const results = new Map<string, Awaited<ReturnType<typeof fetchRdapDetails>>>();
-    await Promise.all(
-      takenDomains.slice(0, MAX_RDAP_TAKEN).map(async (domain) => {
-        try {
-          const rdap = await Promise.race([
-            fetchRdapDetails(domain),
-            new Promise<null>((resolve) =>
-              setTimeout(() => resolve(null), RDAP_TIMEOUT_MS),
-            ),
-          ]);
-          if (rdap) results.set(domain, rdap);
-        } catch {}
-      }),
-    );
-    return results;
+  function logScrapeFailure(registrar: string, query: string, error: string, durationMs: number) {
+    try {
+      const db = getDb();
+      db.insert(scrapeFailures)
+        .values({ registrar, query, error, durationMs })
+        .execute()
+        .catch((e) => console.error(`[Search] Failed to log scrape failure:`, e));
+    } catch {
+      // DB not configured — skip logging
+    }
+  }
+
+  function logSearchRequest(
+    totalResults: number,
+    totalDurationMs: number,
+    registrarResults: Array<{ name: string; status: string; hits: number; durationMs: number; error?: string }>,
+  ) {
+    try {
+      const db = getDb();
+      db.insert(searchLogs)
+        .values({ query: baseName, totalResults, totalDurationMs, registrarResults })
+        .execute()
+        .catch((e) => console.error(`[Search] Failed to log search:`, e));
+    } catch {
+      // DB not configured — skip
+    }
   }
 
   // ── Stream response (SSE) ────────────────────────────────────────────────
@@ -165,8 +130,9 @@ export async function GET(req: NextRequest) {
         });
 
         const domainPricingHits = new Map<string, Map<string, RegistrarSearchHit>>();
-        const dnsAvailability = new Map<string, boolean>();
         const sourceStatuses: SourceStatus[] = [];
+        const registrarTimings: Array<{ name: string; status: string; hits: number; durationMs: number; error?: string }> = [];
+        const searchStart = Date.now();
 
         write({
           type: "init",
@@ -175,47 +141,29 @@ export async function GET(req: NextRequest) {
 
         // Registrar scrapes — each emits a batch as it completes
         const registrarPhases = ALL_REGISTRARS.map(async (registrar) => {
+          const t0 = Date.now();
           const status = await runRegistrar(registrar, domainPricingHits);
+          registrarTimings.push({ name: status.name, status: status.status, hits: status.count, durationMs: Date.now() - t0 });
           sourceStatuses.push(status);
-
-          // DNS-verify newly discovered domains (only popular TLDs / cross-validated)
-          const newDomains = filterDomainsForDns(
-            [...domainPricingHits.keys()].filter((d) => !dnsAvailability.has(d)),
-            domainPricingHits,
-          );
-          if (newDomains.length > 0) {
-            const dnsResults = await dnsVerify(newDomains);
-            for (const [d, a] of dnsResults) dnsAvailability.set(d, a);
-          }
 
           write({
             type: "batch",
             registrar: registrar.name,
             registrarStatus: status.status,
-            results: buildSearchResults(domainPricingHits, baseName, userTld, dnsAvailability),
+            results: buildSearchResults(domainPricingHits, baseName, userTld),
             sourceStatuses: [...sourceStatuses],
           });
         });
 
         Promise.all(registrarPhases)
-          .then(async () => {
-            // RDAP for taken domains after all registrars + DNS complete
-            const takenDomains = [...dnsAvailability.entries()]
-              .filter(([, avail]) => !avail)
-              .map(([domain]) => domain);
-
-            if (takenDomains.length > 0) {
-              const rdapResults = await runRdap(takenDomains);
-              for (const [domain, rdap] of rdapResults) {
-                write({ type: "rdap_update", domain, registration: rdap });
-              }
-            }
-            write({ type: "rdap_done" });
+          .then(() => {
             write({ type: "complete" });
+            logSearchRequest(domainPricingHits.size, Date.now() - searchStart, registrarTimings);
             try { controller.close(); } catch {}
           })
           .catch(() => {
             write({ type: "complete" });
+            logSearchRequest(domainPricingHits.size, Date.now() - searchStart, registrarTimings);
             try { controller.close(); } catch {}
           });
       },
@@ -234,34 +182,24 @@ export async function GET(req: NextRequest) {
   // ── JSON response (default) ──────────────────────────────────────────────
 
   try {
+    const jsonSearchStart = Date.now();
     const domainPricingHits = new Map<string, Map<string, RegistrarSearchHit>>();
     const sourceStatuses: SourceStatus[] = [];
+    const jsonRegistrarTimings: Array<{ name: string; status: string; hits: number; durationMs: number; error?: string }> = [];
 
-    // Step 1: All registrar scrapes in parallel
+    // All registrar scrapes in parallel
     await Promise.all(
       ALL_REGISTRARS.map(async (registrar) => {
+        const t0 = Date.now();
         const status = await runRegistrar(registrar, domainPricingHits);
+        jsonRegistrarTimings.push({ name: status.name, status: status.status, hits: status.count, durationMs: Date.now() - t0 });
         sourceStatuses.push(status);
       }),
     );
 
-    // Step 2: DNS-verify discovered domains (filtered to popular TLDs / cross-validated)
-    const allDomains = filterDomainsForDns([...domainPricingHits.keys()], domainPricingHits);
-    const dnsAvailability = await dnsVerify(allDomains);
+    const results = buildSearchResults(domainPricingHits, baseName, userTld);
 
-    // Step 3: RDAP for taken domains
-    const takenDomains = [...dnsAvailability.entries()]
-      .filter(([, avail]) => !avail)
-      .map(([domain]) => domain);
-
-    const rdapResults = await runRdap(takenDomains);
-
-    // Build final results
-    const results = buildSearchResults(domainPricingHits, baseName, userTld, dnsAvailability);
-    for (const result of results) {
-      const rdap = rdapResults.get(result.domain);
-      if (rdap) result.registration = rdap;
-    }
+    logSearchRequest(results.length, Date.now() - jsonSearchStart, jsonRegistrarTimings);
 
     return NextResponse.json({
       keyword: baseName,

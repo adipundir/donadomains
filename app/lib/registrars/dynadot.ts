@@ -11,7 +11,7 @@ const SEARCH_URL = (q: string) =>
 
 async function searchDomains(query: string): Promise<RegistrarSearchResult> {
   const url = SEARCH_URL(query);
-  const { hits, fetchTimeMs, error } = await searchRegistrarPage(NAME, url, buildBuyUrl, 8000);
+  const { hits, fetchTimeMs, error } = await searchRegistrarPage(NAME, url, buildBuyUrl, 2000);
   return { registrar: NAME, hits, fetchTimeMs, error };
 }
 

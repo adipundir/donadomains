@@ -3,13 +3,7 @@ export interface BuyLink {
   url: string;
   price?: string;
   priceNum?: number;
-  renewalPrice?: string;
-  renewalPriceNum?: number;
   isCheapest?: boolean;
-  /** True when the registration price is a first-year promotional rate significantly below renewal. */
-  promo?: boolean;
-  /** True when this link has the lowest renewal price (best long-term value). */
-  cheapestLongTerm?: boolean;
   premium?: boolean;
   source: "api" | "scraped";
 }
