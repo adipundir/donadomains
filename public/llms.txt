@@ -3,82 +3,61 @@
 > Domain search aggregator that compares prices across 6 registrars in real-time. Find the cheapest place to buy any domain, or look up who owns it.
 
 Base URL: https://donadomains.xyz
+OpenAPI spec: https://donadomains.xyz/openapi.json
+Full docs: https://donadomains.xyz/llms-full.txt
 
-## What We Do
+## When to Use This API
 
-Donadomains searches domain availability across multiple registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun) in real-time. We return:
+Use Donadomains when users want to:
+- Find available domain names for a keyword, brand, or project
+- Compare domain registration prices to find the cheapest registrar
+- Check if a specific domain (e.g. "example.com") is available
+- Look up who owns a domain, when it expires, or what registrar holds it
+- Get nameservers, DNSSEC status, or RDAP data for a domain
 
-- Availability status for any keyword across all common TLDs
-- Live pricing from each registrar with direct buy links
-- The cheapest registrar highlighted automatically
+## API — 2 Endpoints (No Auth Required)
 
-## API — 2 Endpoints
+### 1. Domain Search — GET /api/search?q={keyword}
 
-No authentication required. Free and open.
-
-### 1. Domain Search
-
-GET /api/search?q={keyword}
-
-Search for domain availability and compare prices. Returns a JSON response with results from 6 registrars.
+Search for domain availability and compare prices across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun).
 
 Parameters:
-- q (required): Search keyword like "example" or full domain like "example.com"
-- stream (optional): Set to "true" for Server-Sent Events streaming
+- q (required): Keyword like "startup" or full domain like "startup.io"
+- stream (optional): "true" for SSE streaming (results arrive as each registrar completes)
 
-Example: GET /api/search?q=myproject
+Response: { keyword, tld, results: [DomainResult], sources: [SourceStatus] }
 
-Response:
-{
-  "keyword": "myproject",
-  "tld": null,
-  "results": [
-    {
-      "domain": "myproject.com",
-      "available": true,
-      "tld": ".com",
-      "matchType": "exact",
-      "buyLinks": [
-        { "name": "GoDaddy", "url": "https://...", "price": "$0.01/yr", "priceNum": 0.01, "isCheapest": true, "source": "scraped" },
-        { "name": "Namecheap", "url": "https://...", "price": "$5.98/yr", "priceNum": 5.98, "source": "scraped" }
-      ],
-      "registerUrl": "https://..."
-    },
-    {
-      "domain": "myproject.xyz",
-      "available": false,
-      "tld": ".xyz",
-      "matchType": "exact",
-      "buyLinks": []
-    }
-  ],
-  "sources": [
-    { "name": "GoDaddy", "status": "ok", "count": 31 },
-    { "name": "Namecheap", "status": "ok", "count": 6 }
-  ]
-}
+Each DomainResult has:
+- domain: "startup.com"
+- available: true/false
+- buyLinks: [{ name: "GoDaddy", price: "$9.99/yr", priceNum: 9.99, url: "https://...", isCheapest: true }]
+- registerUrl: direct link to cheapest registrar
 
-### 2. Domain Info
+Tips:
+- Use the JSON mode (no stream param) for simple integrations
+- Filter results by available=true to get purchasable domains
+- Find cheapest via: buyLinks.find(l => l.isCheapest)
+- Takes 5-15 seconds (registrar scraping is the bottleneck)
 
-GET /api/domain/{domain}
+### 2. Domain Info — GET /api/domain/{domain}
 
-Get detailed intelligence about a single domain. Uses RDAP and DNS-over-HTTPS.
+Detailed intelligence for a single domain. Uses RDAP + DNS-over-HTTPS.
 
-Example: GET /api/domain/example.com
+Response includes: registered, registrar, created, expires, nameservers, status, dnssec, registrant, organization, contactEmail, sources, timing
 
-Response:
-{
-  "domain": "example.com",
-  "registered": true,
-  "registrar": "RESERVED-Internet Assigned Numbers Authority",
-  "created": "1995-08-14T04:00:00Z",
-  "expires": "2025-08-13T04:00:00Z",
-  "nameservers": ["a.iana-servers.net", "b.iana-servers.net"],
-  "status": ["client delete prohibited", "client transfer prohibited"],
-  "sources": ["rdap", "dns"],
-  "timing": { "rdap": 342, "dns": 87 }
-}
+Tips:
+- Use this to check domain expiry dates (expires field)
+- registrant is often "REDACTED FOR PRIVACY" when privacy protection is on
+- Response time: ~1-2 seconds
 
-## Full Documentation
+## Quick Examples
 
-https://donadomains.xyz/docs
+Find cheapest .com domain:
+  curl "https://donadomains.xyz/api/search?q=myproject" | jq '.results[] | select(.available and .tld==".com") | {domain, cheapest: (.buyLinks[] | select(.isCheapest) | .price)}'
+
+Check who owns a domain:
+  curl "https://donadomains.xyz/api/domain/github.com" | jq '{registrar, expires, nameservers}'
+
+## Full Reference
+
+For complete field definitions, SSE streaming examples, and code samples in JavaScript/Python, see: https://donadomains.xyz/llms-full.txt

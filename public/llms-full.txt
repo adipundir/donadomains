@@ -230,13 +230,74 @@ else:
 
 ---
 
+## Common Recipes
+
+### Find the cheapest available domain for a keyword
+
+```bash
+curl -s "https://donadomains.xyz/api/search?q=myproject" | \
+  jq '[.results[] | select(.available) | {domain, price: (.buyLinks[] | select(.isCheapest) | .price), registrar: (.buyLinks[] | select(.isCheapest) | .name), url: .registerUrl}] | sort_by(.price)'
+```
+
+### Check if a specific domain is available
+
+```javascript
+const res = await fetch("https://donadomains.xyz/api/search?q=myproject.com");
+const data = await res.json();
+const exact = data.results.find(r => r.domain === "myproject.com");
+
+if (exact?.available) {
+  const cheapest = exact.buyLinks.find(l => l.isCheapest);
+  console.log(`Available! ${cheapest.price} at ${cheapest.name}`);
+  console.log(`Buy: ${cheapest.url}`);
+} else {
+  console.log("Taken");
+}
+```
+
+### Find all available .com domains under $15/yr
+
+```python
+import requests
+
+data = requests.get("https://donadomains.xyz/api/search", params={"q": "coolstartup"}).json()
+
+for r in data["results"]:
+    if r["available"] and r["tld"] == ".com":
+        for link in r.get("buyLinks", []):
+            if link.get("priceNum", 999) < 15:
+                print(f"{r['domain']} — {link['price']} at {link['name']}")
+```
+
+### Monitor a domain's expiry date
+
+```javascript
+const res = await fetch("https://donadomains.xyz/api/domain/expiring-domain.com");
+const intel = await res.json();
+
+if (intel.expires) {
+  const days = Math.ceil((new Date(intel.expires) - Date.now()) / 86400000);
+  console.log(`Expires in ${days} days (${intel.expires})`);
+  console.log(`Registrar: ${intel.registrar}`);
+}
+```
+
+### Compare prices across all registrars for one domain
+
+```bash
+curl -s "https://donadomains.xyz/api/search?q=example.io" | \
+  jq '.results[] | select(.domain=="example.io") | .buyLinks[] | {registrar: .name, price: .price, cheapest: .isCheapest}'
+```
+
+---
+
 ## How It Works
 
-1. **Registrar Discovery**: When you search, we scrape 6 registrar search pages in parallel via Firecrawl. Each registrar returns domains across the TLDs they support — no hardcoded list.
+1. **Registrar Scraping**: All 6 registrar search pages are scraped in parallel via Firecrawl. Each registrar returns domains across the TLDs they support — no hardcoded list.
 
-2. **Price Aggregation**: For available domains, we merge pricing from all registrars and mark the cheapest option with `isCheapest: true`.
+2. **Price Aggregation**: For available domains, pricing from all registrars is merged and the cheapest option is marked with `isCheapest: true`.
 
-3. **Streaming**: Results stream to the client via SSE as each registrar completes. Fast registrars (Dynadot, Name.com) return in ~2-5s; slower ones (GoDaddy, Porkbun) may take 10-15s.
+3. **Streaming**: Results stream via SSE as each registrar completes. Fast registrars (Dynadot, Name.com) return in ~2-5s; slower ones (GoDaddy, Porkbun) may take 10-15s.
 
 ## Notes
 
@@ -244,3 +305,5 @@ else:
 - Response time: ~5-15 seconds for search (registrar scraping is the bottleneck), ~1-2 seconds for domain info
 - Prices are live — scraped from registrar websites in real-time, not cached
 - Privacy: owner contact details only shown when the registrant hasn't opted into privacy protection
+- Some registrars (GoDaddy, Porkbun) may intermittently fail — check the `sources` array in the response to see which succeeded
+- The `registerUrl` field gives you a direct link to purchase at the cheapest registrar — use this for one-click buy flows
