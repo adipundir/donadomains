@@ -1,10 +1,10 @@
 import type { RegistrarSearchHit, RegistrarSearchResult } from "./types";
 import { firecrawlScrape } from "./firecrawl-client";
 
-const PREMIUM_STRONG_RE = /aftermarket|make\s+an?\s+offer|auction|backorder/i;
+const PREMIUM_STRONG_RE = /aftermarket|make\s*(?:an?\s+)?offer|auction|backorder/i;
 const PREMIUM_LABEL_RE = /\bpremium\b/i;
 const PREMIUM_DISCLAIMER_RE = /non[- ]?premium|not applicable to premium|premium domains only|premium names|auctionspremium|premiumgenerator/i;
-const TAKEN_RE = /taken|unavailable|registered|not available|sorry/i;
+const TAKEN_RE = /\btaken\b|unavailable|registered|not available|sorry|domain taken|hire a broker|broker service|help you get it|inquire/i;
 const PREMIUM_PRICE_THRESHOLD = 500;
 /** Number of non-empty lines to collect around a domain mention for context. */
 const CONTEXT_NON_EMPTY = 6;
@@ -116,19 +116,42 @@ export function parseSearchMarkdown(
     // Skip lines with many domain-like matches — likely TLD selector lists, not results
     if (domainMatches.length > 10) continue;
 
-    // Collect context lines, skipping blanks so whitespace-heavy pages
-    // (e.g. GoDaddy) don't push prices out of the window.
+    // Check backward context (up to 3 non-empty lines before) for taken/premium signals only.
+    // This catches "Domain Taken" headers that GoDaddy puts before the domain line.
+    // We don't include backward lines in price extraction to avoid price bleeding.
+    let backTaken = false;
+    let backPremium = false;
+    let backNonEmpty = 0;
+    for (let j = i - 1; j >= 0 && j >= i - 6 && backNonEmpty < 3; j--) {
+      const bLine = lines[j].trim();
+      if (bLine.length === 0) continue;
+      backNonEmpty++;
+      const bLower = bLine.toLowerCase();
+      if (TAKEN_RE.test(bLower)) backTaken = true;
+      if (PREMIUM_STRONG_RE.test(bLower) || (PREMIUM_LABEL_RE.test(bLower) && !PREMIUM_DISCLAIMER_RE.test(bLower))) backPremium = true;
+    }
+
+    // Collect forward context, but stop if we hit another domain name.
+    // This prevents price bleeding from adjacent domain listings.
     const ctxParts: string[] = [line];
     let nonEmpty = 1;
     for (let j = i + 1; j < lines.length && j <= i + CONTEXT_MAX_RAW && nonEmpty < CONTEXT_NON_EMPTY; j++) {
-      ctxParts.push(lines[j]);
-      if (lines[j].trim().length > 0) nonEmpty++;
+      const fwdLine = lines[j];
+      // Stop if this line contains a different domain (new listing)
+      if (fwdLine.trim().length > 0) {
+        DOMAIN_RE.lastIndex = 0;
+        const fwdDomains = [...fwdLine.matchAll(DOMAIN_RE)].filter(m => !INFRA_DOMAINS.has(m[1].toLowerCase()));
+        if (fwdDomains.length > 0) break;
+      }
+      ctxParts.push(fwdLine);
+      if (fwdLine.trim().length > 0) nonEmpty++;
     }
+
     const rawContext = ctxParts.join("\n");
     const ctxLower = rawContext.toLowerCase();
 
-    const isTaken = TAKEN_RE.test(ctxLower);
-    const isPremium = PREMIUM_STRONG_RE.test(ctxLower) ||
+    const isTaken = backTaken || TAKEN_RE.test(ctxLower);
+    const isPremium = backPremium || PREMIUM_STRONG_RE.test(ctxLower) ||
       (PREMIUM_LABEL_RE.test(ctxLower) && !PREMIUM_DISCLAIMER_RE.test(ctxLower));
 
     const cleanContext = stripPromoPrices(rawContext);
