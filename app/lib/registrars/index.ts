@@ -15,8 +15,9 @@ import porkbun from "./porkbun";
 export type { BuyLink, RegistrarSearchResult, RegistrarSearchHit } from "./types";
 
 // Ordered by reliability + speed so the streaming UI shows results fast.
-// Dynadot/Name.com (2s wait, consistent) fill the first batch with GoDaddy.
-// Namecheap/Hover (4s wait) in the second batch. Porkbun (15s wait) last.
+// All registrars use Firecrawl scraping for live, accurate pricing.
+// Dynadot/Name.com (5s/2s wait) fill the first batch with GoDaddy.
+// Namecheap/Hover (4s/5s wait) in the second batch. Porkbun (8s wait) last.
 export const ALL_REGISTRARS: RegistrarModule[] = [
   dynadot,
   namecom,
@@ -38,13 +39,26 @@ const SEARCH_TIMEOUT_MS = 40_000;
 export async function searchAllRegistrars(query: string): Promise<RegistrarSearchResult[]> {
   const results = await Promise.all(
     ALL_REGISTRARS.map(async (r) => {
-      try {
-        return await Promise.race([
+      const doSearch = () =>
+        Promise.race([
           r.searchDomains(query),
           new Promise<RegistrarSearchResult>((_, reject) =>
             setTimeout(() => reject(new Error("timeout")), SEARCH_TIMEOUT_MS)
           ),
         ]);
+
+      try {
+        const first = await doSearch();
+        // Retry once if a scrape-based registrar returned 0 hits (page may not have rendered)
+        if (first.hits.length === 0 && !first.error?.includes("timeout")) {
+          console.log(`[${r.name}] 0 hits — retrying once`);
+          try {
+            return await doSearch();
+          } catch {
+            return first; // return original result if retry also fails
+          }
+        }
+        return first;
       } catch {
         return { registrar: r.name, hits: [], fetchTimeMs: SEARCH_TIMEOUT_MS, error: "Search timed out" } as RegistrarSearchResult;
       }

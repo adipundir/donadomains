@@ -86,12 +86,12 @@
                     }
                   ],
                   "sources": [
-                    { "name": "Dynadot", "status": "ok", "count": 45 },
-                    { "name": "Name.com", "status": "ok", "count": 27 },
-                    { "name": "GoDaddy", "status": "ok", "count": 33 },
-                    { "name": "Namecheap", "status": "ok", "count": 6 },
-                    { "name": "Hover", "status": "ok", "count": 490 },
-                    { "name": "Porkbun", "status": "failed", "count": 0 }
+                    { "name": "Dynadot", "status": "ok", "count": 45, "durationMs": 6821 },
+                    { "name": "Name.com", "status": "ok", "count": 27, "durationMs": 8234 },
+                    { "name": "GoDaddy", "status": "ok", "count": 33, "durationMs": 12450 },
+                    { "name": "Namecheap", "status": "ok", "count": 6, "durationMs": 9102 },
+                    { "name": "Hover", "status": "ok", "count": 490, "durationMs": 11873 },
+                    { "name": "Porkbun", "status": "failed", "count": 0, "durationMs": 20000, "error": "timeout" }
                   ]
                 }
               },
@@ -236,9 +236,11 @@
         "properties": {
           "name": { "type": "string", "description": "Registrar name" },
           "status": { "type": "string", "enum": ["ok", "failed"], "description": "\"ok\" if the registrar returned results, \"failed\" if scrape timed out or errored" },
-          "count": { "type": "integer", "description": "Number of domain hits returned by this registrar (0 if failed)" }
+          "count": { "type": "integer", "description": "Number of domain hits returned by this registrar (0 if failed)" },
+          "durationMs": { "type": "integer", "description": "Time in milliseconds the registrar scrape took" },
+          "error": { "type": "string", "description": "Error message if the registrar scrape failed (only present when status is \"failed\")" }
         },
-        "required": ["name", "status", "count"]
+        "required": ["name", "status", "count", "durationMs"]
       },
       "DomainIntel": {
         "type": "object",

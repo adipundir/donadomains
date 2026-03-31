@@ -117,12 +117,12 @@ const EXAMPLE_SEARCH_JSON = `{
     }
   ],
   "sources": [
-    { "name": "Dynadot", "status": "ok", "count": 45 },
-    { "name": "Name.com", "status": "ok", "count": 27 },
-    { "name": "GoDaddy", "status": "ok", "count": 33 },
-    { "name": "Namecheap", "status": "ok", "count": 6 },
-    { "name": "Hover", "status": "ok", "count": 490 },
-    { "name": "Porkbun", "status": "failed", "count": 0 }
+    { "name": "Dynadot", "status": "ok", "count": 45, "durationMs": 6821 },
+    { "name": "Name.com", "status": "ok", "count": 27, "durationMs": 8234 },
+    { "name": "GoDaddy", "status": "ok", "count": 33, "durationMs": 12450 },
+    { "name": "Namecheap", "status": "ok", "count": 6, "durationMs": 9102 },
+    { "name": "Hover", "status": "ok", "count": 490, "durationMs": 11873 },
+    { "name": "Porkbun", "status": "failed", "count": 0, "durationMs": 20000, "error": "timeout" }
   ]
 }`;
 
@@ -376,6 +376,15 @@ for line in res.iter_lines():
               <FieldRow name="isCheapest" type="boolean" desc="True if this is the cheapest option across all registrars" optional />
               <FieldRow name="premium" type="boolean" desc="True if this is a premium/aftermarket listing" optional />
               <FieldRow name="source" type="string" desc='Always "scraped" — prices are live-scraped from registrar websites' />
+            </div>
+
+            <h3 className="font-comic-title text-xl mt-6 mb-2">SourceStatus Fields</h3>
+            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
+              <FieldRow name="name" type="string" desc="Registrar name (e.g. GoDaddy, Dynadot)" />
+              <FieldRow name="status" type="string" desc='"ok" if the registrar returned results, "failed" if it timed out or errored' />
+              <FieldRow name="count" type="number" desc="Number of domain hits returned (0 if failed)" />
+              <FieldRow name="durationMs" type="number" desc="Time in milliseconds the registrar scrape took" />
+              <FieldRow name="error" type="string" desc="Error message when status is failed (e.g. timeout)" optional />
             </div>
 
             <h3 className="font-comic-title text-xl mt-6 mb-2">Error Responses</h3>

@@ -6,6 +6,7 @@ import {
   buildSearchResults,
 } from "@/app/lib/domain-scraper";
 import type { SourceStatus } from "@/app/lib/domain-scraper";
+import { checkApiRateLimit, getClientIp } from "@/app/lib/api-rate-limit";
 
 const REGISTRAR_TIMEOUT_MS = 20_000;
 
@@ -64,6 +65,12 @@ export async function GET(req: NextRequest) {
       { error: "Invalid keyword" },
       { status: 400 },
     );
+  }
+
+  // Rate limit after validation — don't burn tokens on bad requests
+  const rateLimitError = await checkApiRateLimit(getClientIp(req), "search");
+  if (rateLimitError) {
+    return NextResponse.json({ error: rateLimitError }, { status: 429 });
   }
 
   console.log(`[Search] "${baseName}" (userTld=${userTld ?? "none"}, stream=${wantStream})`);

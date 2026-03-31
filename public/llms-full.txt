@@ -80,11 +80,13 @@ Each SSE message has a `data:` prefix containing JSON. Event types:
 
 ### SourceStatus
 
-| Field  | Type   | Description |
-|--------|--------|-------------|
-| name   | string | Registrar name |
-| status | string | "ok" or "failed" |
-| count  | number | Number of domains returned by this source |
+| Field      | Type    | Description |
+|------------|---------|-------------|
+| name       | string  | Registrar name |
+| status     | string  | "ok" or "failed" |
+| count      | number  | Number of domains returned by this source |
+| durationMs | number  | Time in milliseconds the registrar scrape took |
+| error      | string? | Error message when status is "failed" (e.g. "timeout") |
 
 ### Error Responses
 

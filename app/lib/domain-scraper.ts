@@ -106,10 +106,14 @@ export function buildSearchResults(
 
     // Determine availability:
     // 1. DNS is authoritative when present
-    // 2. Fall back to registrar signal
+    // 2. "explicitlyTaken" from any registrar is definitive (e.g. "Hire a Broker", "unavailable")
+    // 3. Otherwise, available if any registrar says so with a price
     let available: boolean;
+    const anyExplicitlyTaken = registrarVotes.some((h) => h.explicitlyTaken);
     if (dnsAvailability?.has(domain)) {
       available = !anyPremium && (dnsAvailability.get(domain) ?? false);
+    } else if (anyExplicitlyTaken) {
+      available = false;
     } else {
       available = !anyPremium && registrarVotes.some((h) => h.available && h.registration != null);
     }
@@ -132,22 +136,42 @@ export function buildSearchResults(
     });
   }
 
+  // Sort priority:
+  // 1. User's exact domain (e.g. coolstartup.com if they searched coolstartup.com)
+  // 2. Available before taken
+  // 3. User's TLD (if they specified one)
+  // 4. Exact matches (keyword.tld) before similar (keywordXYZ.tld)
+  // 5. Registrar coverage — domains returned by more registrars rank higher
+  //    (most common results in the union float to the top)
+  // 6. Popular TLD order (.com, .net, .org, .io, ...)
+  // 7. Lower price first
   results.sort((a, b) => {
+    // 1. User's exact domain pinned at top
     if (userExactDomain) {
       if (a.domain === userExactDomain && b.domain !== userExactDomain) return -1;
       if (a.domain !== userExactDomain && b.domain === userExactDomain) return 1;
     }
+    // 2. Available before taken
     if (a.available !== b.available) return a.available ? -1 : 1;
+    // 3. User's TLD preference
     if (userTld) {
       if (a.tld === userTld && b.tld !== userTld) return -1;
       if (a.tld !== userTld && b.tld === userTld) return 1;
     }
+    // 4. Exact matches first
     const exactA = a.matchType === "exact" ? 0 : 1;
     const exactB = b.matchType === "exact" ? 0 : 1;
     if (exactA !== exactB) return exactA - exactB;
+    // 5. More registrar coverage = higher rank
+    const coverageDiff = (b.buyLinks?.length ?? 0) - (a.buyLinks?.length ?? 0);
+    if (coverageDiff !== 0) return coverageDiff;
+    // 6. Popular TLD order
     const tldDiff = tldSortKey(a.tld) - tldSortKey(b.tld);
     if (tldDiff !== 0) return tldDiff;
-    return (b.buyLinks?.length ?? 0) - (a.buyLinks?.length ?? 0);
+    // 7. Cheaper first
+    const priceA = a.buyLinks?.find((l) => l.isCheapest)?.priceNum ?? Infinity;
+    const priceB = b.buyLinks?.find((l) => l.isCheapest)?.priceNum ?? Infinity;
+    return priceA - priceB;
   });
 
   return results;

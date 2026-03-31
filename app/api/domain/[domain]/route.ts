@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { fetchDomainIntel } from "@/app/lib/domain-intel";
+import { checkApiRateLimit, getClientIp } from "@/app/lib/api-rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -8,7 +9,7 @@ const DOMAIN_RE = /^[a-z0-9][a-z0-9.-]*[a-z0-9]\.[a-z]{2,}$/;
 const TIMEOUT_MS = 10_000;
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ domain: string }> },
 ) {
   const { domain } = await params;
@@ -19,6 +20,12 @@ export async function GET(
       { error: "Invalid domain format", example: "example.com" },
       { status: 400 },
     );
+  }
+
+  // Rate limit after validation — don't burn tokens on bad requests
+  const rateLimitError = await checkApiRateLimit(getClientIp(req), "domain");
+  if (rateLimitError) {
+    return NextResponse.json({ error: rateLimitError }, { status: 429 });
   }
 
   try {

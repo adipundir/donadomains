@@ -25,7 +25,7 @@ Parameters:
 - q (required): Keyword like "startup" or full domain like "startup.io"
 - stream (optional): "true" for SSE streaming (results arrive as each registrar completes)
 
-Response: { keyword, tld, results: [DomainResult], sources: [SourceStatus] }
+Response: { keyword, tld, results: [DomainResult], sources: [{ name, status, count, durationMs, error? }] }
 
 Each DomainResult has:
 - domain: "startup.com"
