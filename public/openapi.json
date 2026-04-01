@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Donadomains API",
-    "description": "Domain search aggregator — compare registration prices across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun) in real-time. Also provides detailed domain intelligence via RDAP and DNS.\n\nUse cases:\n- Find available domains for a keyword or brand name\n- Compare prices across registrars and find the cheapest\n- Check if a specific domain is taken\n- Look up domain ownership, expiry, registrar, nameservers\n\nNo authentication required. All prices are live-scraped, not cached.",
+    "description": "Domain search aggregator — compare registration prices across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun) in real-time. Also provides detailed domain intelligence via RDAP and DNS.\n\nUse cases:\n- Find available domains for a keyword or brand name\n- Compare prices across registrars and find the cheapest\n- Check if a specific domain is taken\n- Look up domain ownership, expiry, registrar, nameservers\n\nFree endpoints require no authentication. Paid endpoints (/api/paid/*) use the x402 payment protocol on Starknet — no API keys, pay per request with USDC. All prices are live-scraped, not cached.",
     "version": "1.0.0",
     "contact": {
       "name": "Donadomains",
@@ -173,6 +173,71 @@
                 "example": { "error": "Gateway Timeout" }
               }
             }
+          }
+        }
+      }
+    }
+  },
+    "/api/paid/search": {
+      "get": {
+        "operationId": "paidSearchDomains",
+        "summary": "Search domains (x402 paid, no rate limits)",
+        "description": "Same as /api/search but protected by x402 payment protocol on Starknet. Costs 0.01 USDC per request. No rate limits. Requires PAYMENT-SIGNATURE header with a signed Starknet OutsideExecution. Use the starknet-x402 npm package for automatic 402 flow handling.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "Search keyword or full domain",
+            "schema": { "type": "string", "minLength": 1, "maxLength": 63 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results (same schema as /api/search)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SearchResponse" }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required — PAYMENT-REQUIRED header contains base64-encoded payment requirements"
+          },
+          "400": {
+            "description": "Missing or invalid query parameter"
+          }
+        }
+      }
+    },
+    "/api/paid/domain/{domain}": {
+      "get": {
+        "operationId": "paidGetDomainInfo",
+        "summary": "Get domain info (x402 paid, no rate limits)",
+        "description": "Same as /api/domain/{domain} but protected by x402 payment protocol on Starknet. Costs 0.005 USDC per request. No rate limits. Requires PAYMENT-SIGNATURE header.",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "description": "Fully qualified domain name",
+            "schema": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*[a-z0-9]\\.[a-z]{2,}$" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Domain intelligence (same schema as /api/domain/{domain})",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DomainIntel" }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required — PAYMENT-REQUIRED header contains base64-encoded payment requirements"
+          },
+          "400": {
+            "description": "Invalid domain format"
           }
         }
       }

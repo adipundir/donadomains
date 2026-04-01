@@ -4,7 +4,7 @@
 
 Base URL: https://donadomains.xyz
 Docs: https://donadomains.xyz/docs
-Auth: None required (free, unauthenticated)
+Auth: Free endpoints require none. Paid endpoints (/api/paid/*) use x402 payment protocol on Starknet.
 
 ---
 
@@ -232,6 +232,47 @@ else:
 
 ---
 
+## Paid API (x402 on Starknet)
+
+The same endpoints are available as paid, rate-limit-free versions using the x402 payment protocol on Starknet. No API keys — your Starknet wallet signs a payment per request.
+
+### Endpoints & Pricing
+
+| Endpoint | Price | Description |
+|----------|-------|-------------|
+| GET /api/paid/search?q={keyword} | 0.01 USDC | Domain search across 6 registrars |
+| GET /api/paid/domain/{domain} | 0.005 USDC | Domain intelligence (RDAP + DNS) |
+
+### How It Works
+
+1. Request hits `/api/paid/*` → server returns **402 Payment Required** with payment details in the `PAYMENT-REQUIRED` header.
+2. Client signs an OutsideExecution (SNIP-9) containing a USDC transfer, built via AVNU paymaster (gas-free).
+3. Client retries with the `PAYMENT-SIGNATURE` header → server verifies and settles on-chain → returns data + tx hash.
+
+### Client Example (starknet-x402)
+
+```javascript
+import { x402axios } from 'starknet-x402';
+import { Account, RpcProvider } from 'starknet';
+
+const provider = new RpcProvider({ nodeUrl: process.env.STARKNET_RPC_URL });
+const account = new Account(provider, address, privateKey);
+
+// Automatic 402 handling — request, sign, pay, done
+const result = await x402axios.get(
+  'https://donadomains.xyz/api/paid/search?q=myproject',
+  { account, network: 'starknet-sepolia' }
+);
+
+console.log(result.data);                    // search results
+console.log(result.settlement?.transaction); // tx hash on Starknet
+```
+
+Install: `npm install starknet-x402`
+Gas is sponsored by AVNU paymaster. USDC on Starknet Sepolia for testing, mainnet for production.
+
+---
+
 ## Common Recipes
 
 ### Find the cheapest available domain for a keyword
@@ -303,7 +344,7 @@ curl -s "https://donadomains.xyz/api/search?q=example.io" | \
 
 ## Notes
 
-- No authentication required
+- Free endpoints require no authentication; paid endpoints use x402 (Starknet USDC payment per request)
 - Response time: ~5-15 seconds for search (registrar scraping is the bottleneck), ~1-2 seconds for domain info
 - Prices are live — scraped from registrar websites in real-time, not cached
 - Privacy: owner contact details only shown when the registrant hasn't opted into privacy protection

@@ -128,7 +128,7 @@ export function TabbedCode({ tabs }: { tabs: { label: string; code: string }[] }
   );
 }
 
-export function SidebarNav({ items }: { items: { id: string; label: string }[] }) {
+export function SidebarNav({ items }: { items: { id: string; label: string; heading?: boolean }[] }) {
   const [activeSection, setActiveSection] = useState(items[0]?.id ?? "");
 
   useEffect(() => {
@@ -152,17 +152,17 @@ export function SidebarNav({ items }: { items: { id: string; label: string }[] }
   }, [items]);
 
   return (
-    <nav className="hidden lg:block w-40 shrink-0 sticky top-6 self-start">
+    <nav className="hidden lg:block w-44 shrink-0 sticky top-6 self-start">
       <ul className="space-y-1">
-        {items.map((item) => (
-          <li key={item.id}>
+        {items.map((item, i) => (
+          <li key={item.id} className={item.heading && i > 0 ? "pt-3" : ""}>
             <a
               href={`#${item.id}`}
-              className="block px-3 py-1.5 rounded text-sm font-comic-body transition-colors"
+              className={`block px-3 py-1.5 rounded transition-colors ${item.heading ? "text-xs font-comic-title uppercase tracking-wider" : "text-sm font-comic-body"}`}
               style={{
                 background: activeSection === item.id ? "var(--surface-muted)" : "transparent",
-                fontWeight: activeSection === item.id ? 700 : 400,
-                opacity: activeSection === item.id ? 1 : 0.7,
+                fontWeight: activeSection === item.id || item.heading ? 700 : 400,
+                opacity: activeSection === item.id ? 1 : item.heading ? 0.5 : 0.7,
               }}
             >
               {item.label}
