@@ -814,9 +814,10 @@ export default function Home() {
           <div className="flex items-center gap-3 sm:gap-4">
             <a
               href="/docs"
-              className="font-comic-title text-xs sm:text-sm uppercase tracking-wide opacity-60 hover:opacity-100 transition-opacity"
+              className="font-comic-title text-xs sm:text-sm uppercase tracking-wide px-2.5 py-1 rounded transition-opacity hover:opacity-80"
+              style={{ background: "var(--accent)", color: "#000" }}
             >
-              API
+              x402v2 API
             </a>
             <ThemeSwitcher />
           </div>
@@ -1103,13 +1104,10 @@ export default function Home() {
       )}
 
       {/* ── Footer ── */}
-      <footer className={`text-center ${!hasSearched ? 'py-2 sm:py-3' : 'py-5'}`}>
-        <p className="text-xs font-bold uppercase tracking-widest opacity-25">
-          A Donalabs product · {new Date().getFullYear()}
-        </p>
-        <p className="text-[10px] sm:text-xs opacity-30 mt-1">
-          made with love in 🇮🇳
-        </p>
+      <footer className={`flex items-center justify-center gap-1.5 ${!hasSearched ? 'py-2 sm:py-3' : 'py-5'}`}>
+        <span className="text-xs font-bold uppercase tracking-widest opacity-25">a product of</span>
+        <img src="/D.svg" alt="Donalabs" className="h-4 w-4 opacity-25" />
+        <span className="text-xs font-bold uppercase tracking-widest opacity-25">donalabs</span>
       </footer>
     </div>
   );
