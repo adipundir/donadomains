@@ -60,11 +60,21 @@ function tldSortKey(tld: string): number {
 
 export function parseKeyword(keyword: string): { baseName: string; userTld?: string } {
   const lower = keyword.toLowerCase().trim();
+  // 1. Try known common TLDs first (handles multi-part like .co.uk if added)
   for (const tld of COMMON_TLDS) {
     if (lower.endsWith(tld)) {
       const namePart = lower.slice(0, -tld.length).replace(/[^a-z0-9-]/g, "");
       if (namePart.length > 0) return { baseName: namePart, userTld: tld };
       break;
+    }
+  }
+  // 2. Fallback: detect any TLD-like suffix after the last dot (e.g. ".in", ".fr")
+  const lastDot = lower.lastIndexOf(".");
+  if (lastDot > 0) {
+    const possibleTld = lower.slice(lastDot);
+    const namePart = lower.slice(0, lastDot).replace(/[^a-z0-9-]/g, "");
+    if (namePart.length > 0 && /^\.[a-z]{2,}$/.test(possibleTld)) {
+      return { baseName: namePart, userTld: possibleTld };
     }
   }
   return { baseName: lower.replace(/[^a-z0-9-]/g, "") };
