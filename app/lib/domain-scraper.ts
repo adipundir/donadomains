@@ -106,7 +106,8 @@ export function buildSearchResults(
     // For exact matches (donadomains.xyz, donadomains.computer, etc.),
     // only keep popular TLDs or TLDs that 2+ registrars returned.
     // This prevents Hover's 470 niche TLD suggestions from flooding results.
-    if (isExact && !POPULAR_TLDS.has(tld) && hits.size < 2) continue;
+    // Always keep the user's exact domain (e.g. donadomains.hh).
+    if (isExact && !POPULAR_TLDS.has(tld) && hits.size < 2 && domain !== userExactDomain) continue;
 
     // Limit "similar" suggestions (thedonadomains.com, donadomainscenter.com)
     if (!isExact) {

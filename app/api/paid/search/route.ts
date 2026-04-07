@@ -12,10 +12,12 @@ import type { RegistrarSearchHit } from "@/app/lib/registrars";
 import {
   parseKeyword,
   buildSearchResults,
+  fetchRdapDetails,
 } from "@/app/lib/domain-scraper";
-import type { SourceStatus } from "@/app/lib/domain-scraper";
+import type { SourceStatus, DomainResult } from "@/app/lib/domain-scraper";
+import { probeDns } from "@/app/lib/domain-intel";
 
-const REGISTRAR_TIMEOUT_MS = 20_000;
+const REGISTRAR_TIMEOUT_MS = 15_000;
 
 async function runRegistrar(
   registrar: (typeof ALL_REGISTRARS)[number],
@@ -66,6 +68,8 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  const userExactDomain = userTld ? `${baseName}${userTld}` : null;
+
   // No rate limiting — x402 payment is the access control
 
   try {
@@ -80,6 +84,35 @@ export async function GET(req: NextRequest) {
     );
 
     const results = buildSearchResults(domainPricingHits, baseName, userTld);
+
+    // Probe user's exact domain via DNS+RDAP if no registrar had it
+    if (userExactDomain && !domainPricingHits.has(userExactDomain)) {
+      const [dns, rdap] = await Promise.allSettled([
+        probeDns(userExactDomain),
+        fetchRdapDetails(userExactDomain),
+      ]);
+      const dnsResult = dns.status === "fulfilled" ? dns.value : null;
+      const rdapResult = rdap.status === "fulfilled" ? rdap.value : null;
+      const isRegistered = dnsResult?.resolves || rdapResult != null;
+
+      const probed: DomainResult = {
+        domain: userExactDomain,
+        available: !isRegistered,
+        tld: userTld!,
+        matchType: "exact",
+        registration: isRegistered && rdapResult ? {
+          registrar: rdapResult.registrar,
+          created: rdapResult.created,
+          expires: rdapResult.expires,
+          registrant: rdapResult.registrant,
+          contactEmail: rdapResult.contactEmail,
+          contactPhone: rdapResult.contactPhone,
+          contactAddress: rdapResult.contactAddress,
+          status: rdapResult.status,
+        } : undefined,
+      };
+      results.unshift(probed);
+    }
 
     return NextResponse.json({
       keyword: baseName,

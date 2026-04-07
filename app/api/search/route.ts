@@ -4,8 +4,10 @@ import type { RegistrarSearchHit } from "@/app/lib/registrars";
 import {
   parseKeyword,
   buildSearchResults,
+  fetchRdapDetails,
 } from "@/app/lib/domain-scraper";
-import type { SourceStatus } from "@/app/lib/domain-scraper";
+import type { SourceStatus, DomainResult } from "@/app/lib/domain-scraper";
+import { probeDns } from "@/app/lib/domain-intel";
 import { checkApiRateLimit, getClientIp } from "@/app/lib/api-rate-limit";
 
 const REGISTRAR_TIMEOUT_MS = 15_000;
@@ -74,6 +76,47 @@ export async function GET(req: NextRequest) {
   }
 
   console.log(`[Search] "${baseName}" (userTld=${userTld ?? "none"}, stream=${wantStream})`);
+
+  const userExactDomain = userTld ? `${baseName}${userTld}` : null;
+
+  /**
+   * When the user searches an exact domain (e.g. "donadomains.hh") and no
+   * registrar returned it, probe DNS + RDAP to check if it's registered.
+   * Returns a DomainResult to inject at the top, or null.
+   */
+  async function probeUserDomain(
+    domainPricingHits: Map<string, Map<string, RegistrarSearchHit>>,
+  ): Promise<DomainResult | null> {
+    if (!userExactDomain) return null;
+    if (domainPricingHits.has(userExactDomain)) return null;
+
+    console.log(`[Search] No registrar returned ${userExactDomain} — probing DNS + RDAP`);
+    const [dns, rdap] = await Promise.allSettled([
+      probeDns(userExactDomain),
+      fetchRdapDetails(userExactDomain),
+    ]);
+
+    const dnsResult = dns.status === "fulfilled" ? dns.value : null;
+    const rdapResult = rdap.status === "fulfilled" ? rdap.value : null;
+    const isRegistered = dnsResult?.resolves || rdapResult != null;
+
+    return {
+      domain: userExactDomain,
+      available: !isRegistered,
+      tld: userTld!,
+      matchType: "exact",
+      registration: isRegistered && rdapResult ? {
+        registrar: rdapResult.registrar,
+        created: rdapResult.created,
+        expires: rdapResult.expires,
+        registrant: rdapResult.registrant,
+        contactEmail: rdapResult.contactEmail,
+        contactPhone: rdapResult.contactPhone,
+        contactAddress: rdapResult.contactAddress,
+        status: rdapResult.status,
+      } : undefined,
+    };
+  }
 
   /** Run a single registrar scrape. */
   async function runRegistrar(
@@ -152,10 +195,22 @@ export async function GET(req: NextRequest) {
         });
 
         Promise.all(registrarPhases)
-          .then(() => {
+          .then(async () => {
+            // Probe user's exact domain via DNS+RDAP if no registrar had it
+            const probed = await probeUserDomain(domainPricingHits);
+            if (probed) {
+              const results = buildSearchResults(domainPricingHits, baseName, userTld);
+              results.unshift(probed);
+              write({
+                type: "batch",
+                registrar: "DNS/RDAP",
+                registrarStatus: "ok",
+                results,
+                sourceStatuses: [...sourceStatuses],
+              });
+            }
             write({ type: "complete" });
             try { controller.close(); } catch {}
-            // Log after stream is closed — user already has results
             logToDb(baseName, domainPricingHits.size, Date.now() - searchStart, registrarTimings);
           })
           .catch(() => {
@@ -193,6 +248,10 @@ export async function GET(req: NextRequest) {
     );
 
     const results = buildSearchResults(domainPricingHits, baseName, userTld);
+
+    // Probe user's exact domain via DNS+RDAP if no registrar had it
+    const probed = await probeUserDomain(domainPricingHits);
+    if (probed) results.unshift(probed);
 
     // Response goes out first, logging happens after
     const response = NextResponse.json({

@@ -429,7 +429,7 @@ function SearchProgress({
   }, [startTime, allDone]);
 
   return (
-    <div className="mb-6 animate-fadeInUp">
+    <div className="mb-6">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2 flex-wrap">
           {names.map((name) => {
@@ -437,15 +437,15 @@ function SearchProgress({
             return (
               <span
                 key={name}
-                className={`font-comic-title text-[10px] uppercase tracking-wide transition-opacity ${
+                className={`font-comic-title text-[10px] uppercase tracking-wide ${
                   s === "done"
-                    ? "opacity-60"
+                    ? "opacity-50"
                     : s === "failed"
-                    ? "opacity-30 line-through"
-                    : "opacity-40 loading-ellipsis"
+                    ? "opacity-25 line-through"
+                    : "opacity-30"
                 }`}
               >
-                {s === "done" ? "✓" : s === "failed" ? "✗" : "…"} {name}
+                {s === "done" ? "✓" : s === "failed" ? "✗" : "·"} {name}
               </span>
             );
           })}
@@ -463,7 +463,7 @@ function SearchProgress({
       </div>
       <div className="w-full h-[3px] bg-[var(--border-light)] overflow-hidden">
         <div
-          className={`h-full transition-all duration-500 ease-out ${allDone ? "bg-[var(--foreground)]" : "bg-[var(--foreground)]/60"}`}
+          className={`h-full transition-all duration-700 ease-out ${allDone ? "bg-[var(--foreground)]" : "bg-[var(--foreground)]/50"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -880,7 +880,7 @@ export default function Home() {
                 </div>
               )}
 
-              {loading && Object.keys(registrarStatuses).length > 0 && (
+              {Object.keys(registrarStatuses).length > 0 && (
                 <SearchProgress
                   statuses={registrarStatuses}
                   resultCount={results.length}
