@@ -126,7 +126,7 @@ async function searchDomains(query: string): Promise<RegistrarSearchResult> {
   console.log(`[${NAME}] Scraping: ${url} (waitFor=${WAIT_MS}ms)`);
 
   try {
-    const result = await firecrawlScrape(url, WAIT_MS);
+    const result = await firecrawlScrape(url, WAIT_MS, process.env.FIRECRAWL_API_KEY_DYNADOT ?? "");
     const elapsed = Date.now() - start;
 
     if (!result.success || !result.markdown) {

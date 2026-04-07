@@ -3,21 +3,24 @@
  *
  * Firecrawl handles Cloudflare, Akamai, and other bot protection automatically.
  * It renders JS, solves challenges, and returns clean HTML/markdown.
+ *
+ * Each registrar uses its own dedicated Firecrawl API key so all 7 scrapes
+ * run against separate rate-limit buckets in parallel with zero contention.
  */
 import { FirecrawlClient } from "@mendable/firecrawl-js";
 
-const API_KEY = process.env.FIRECRAWL_API_KEY ?? "";
+const clientCache = new Map<string, FirecrawlClient>();
 
-let client: FirecrawlClient | null = null;
-
-export function getFirecrawlClient(): FirecrawlClient {
-  if (!API_KEY) {
+export function getFirecrawlClient(apiKey: string): FirecrawlClient {
+  if (!apiKey) {
     throw new Error(
-      "FIRECRAWL_API_KEY is required. Get a key at https://firecrawl.dev"
+      "Firecrawl API key is missing. Each registrar needs its own key — check your .env"
     );
   }
+  let client = clientCache.get(apiKey);
   if (!client) {
-    client = new FirecrawlClient({ apiKey: API_KEY });
+    client = new FirecrawlClient({ apiKey });
+    clientCache.set(apiKey, client);
   }
   return client;
 }
@@ -63,7 +66,8 @@ function isRetryable(error: string): boolean {
  */
 export async function firecrawlScrape(
   url: string,
-  waitMs = 5000,
+  waitMs: number,
+  apiKey: string,
 ): Promise<FirecrawlScrapeResult> {
   const MAX_RETRIES = 2;
   const BACKOFF = [1500, 3000];
@@ -79,7 +83,7 @@ export async function firecrawlScrape(
     }
 
     try {
-      const fc = getFirecrawlClient();
+      const fc = getFirecrawlClient(apiKey);
       const doc = await fc.scrape(url, {
         formats: ["markdown"],
         waitFor: waitMs,

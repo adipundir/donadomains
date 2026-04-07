@@ -169,7 +169,7 @@ async function applyWhoIsScrape(intel: DomainIntel): Promise<void> {
   const t0 = Date.now();
   try {
     const url = `https://who.is/whois/${intel.domain}`;
-    const result = await firecrawlScrape(url, 8000);
+    const result = await firecrawlScrape(url, 8000, process.env.FIRECRAWL_API_KEY_WHOIS ?? "");
     intel.timing["who.is"] = Date.now() - t0;
 
     if (!result.success || !result.markdown) return;

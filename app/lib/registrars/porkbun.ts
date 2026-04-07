@@ -179,7 +179,7 @@ async function searchDomains(query: string): Promise<RegistrarSearchResult> {
   console.log(`[${NAME}] Scraping: ${url} (waitFor=8000ms)`);
 
   try {
-    const result = await firecrawlScrape(url, 8000);
+    const result = await firecrawlScrape(url, 8000, process.env.FIRECRAWL_API_KEY_PORKBUN ?? "");
     const elapsed = Date.now() - start;
 
     if (!result.success || !result.markdown) {
