@@ -413,19 +413,20 @@ function SearchProgress({
 }) {
   const [elapsed, setElapsed] = useState(0);
 
-  useEffect(() => {
-    const id = setInterval(
-      () => setElapsed(Math.floor((Date.now() - startTime) / 1000)),
-      500,
-    );
-    return () => clearInterval(id);
-  }, [startTime]);
-
   const names = Object.keys(statuses);
   const total = names.length;
   const doneCount = names.filter((n) => statuses[n] !== "loading").length;
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
   const allDone = doneCount === total && total > 0;
+
+  useEffect(() => {
+    if (allDone) return;
+    const id = setInterval(
+      () => setElapsed(Math.floor((Date.now() - startTime) / 1000)),
+      500,
+    );
+    return () => clearInterval(id);
+  }, [startTime, allDone]);
 
   return (
     <div className="mb-6 animate-fadeInUp">
@@ -879,7 +880,7 @@ export default function Home() {
                 </div>
               )}
 
-              {Object.keys(registrarStatuses).length > 0 && (
+              {loading && Object.keys(registrarStatuses).length > 0 && (
                 <SearchProgress
                   statuses={registrarStatuses}
                   resultCount={results.length}
