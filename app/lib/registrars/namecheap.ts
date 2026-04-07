@@ -155,7 +155,7 @@ async function searchDomains(query: string): Promise<RegistrarSearchResult> {
   const url = SEARCH_URL(query);
   const start = Date.now();
 
-  const WAIT_MS = 4000;
+  const WAIT_MS = 2000;
   console.log(`[${NAME}] Scraping: ${url} (waitFor=${WAIT_MS}ms)`);
 
   try {

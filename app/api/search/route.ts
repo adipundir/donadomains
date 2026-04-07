@@ -8,7 +8,7 @@ import {
 import type { SourceStatus } from "@/app/lib/domain-scraper";
 import { checkApiRateLimit, getClientIp } from "@/app/lib/api-rate-limit";
 
-const REGISTRAR_TIMEOUT_MS = 20_000;
+const REGISTRAR_TIMEOUT_MS = 15_000;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

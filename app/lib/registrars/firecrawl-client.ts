@@ -6,10 +6,45 @@
  *
  * Each registrar uses its own dedicated Firecrawl API key so all 7 scrapes
  * run against separate rate-limit buckets in parallel with zero contention.
+ *
+ * A per-key concurrency semaphore limits to MAX_CONCURRENT_PER_KEY scrapes
+ * per API key to avoid Firecrawl rate-limit queueing.
  */
 import { FirecrawlClient } from "@mendable/firecrawl-js";
 
+const MAX_CONCURRENT_PER_KEY = 2;
+
 const clientCache = new Map<string, FirecrawlClient>();
+
+/** Simple semaphore: limits concurrent async operations per key. */
+class KeySemaphore {
+  private queues = new Map<string, Array<() => void>>();
+  private active = new Map<string, number>();
+
+  async acquire(key: string): Promise<void> {
+    const current = this.active.get(key) ?? 0;
+    if (current < MAX_CONCURRENT_PER_KEY) {
+      this.active.set(key, current + 1);
+      return;
+    }
+    return new Promise<void>((resolve) => {
+      if (!this.queues.has(key)) this.queues.set(key, []);
+      this.queues.get(key)!.push(resolve);
+    });
+  }
+
+  release(key: string): void {
+    const queue = this.queues.get(key);
+    if (queue && queue.length > 0) {
+      const next = queue.shift()!;
+      next();
+    } else {
+      this.active.set(key, (this.active.get(key) ?? 1) - 1);
+    }
+  }
+}
+
+const semaphore = new KeySemaphore();
 
 export function getFirecrawlClient(apiKey: string): FirecrawlClient {
   if (!apiKey) {
@@ -69,8 +104,21 @@ export async function firecrawlScrape(
   waitMs: number,
   apiKey: string,
 ): Promise<FirecrawlScrapeResult> {
-  const MAX_RETRIES = 2;
-  const BACKOFF = [1500, 3000];
+  await semaphore.acquire(apiKey);
+  try {
+    return await firecrawlScrapeInner(url, waitMs, apiKey);
+  } finally {
+    semaphore.release(apiKey);
+  }
+}
+
+async function firecrawlScrapeInner(
+  url: string,
+  waitMs: number,
+  apiKey: string,
+): Promise<FirecrawlScrapeResult> {
+  const MAX_RETRIES = 1;
+  const BACKOFF = [1000];
 
   let lastError = "";
   let bestResult: FirecrawlScrapeResult | null = null;
@@ -87,7 +135,7 @@ export async function firecrawlScrape(
       const doc = await fc.scrape(url, {
         formats: ["markdown"],
         waitFor: waitMs,
-        timeout: 30000,
+        timeout: 20000,
       });
 
       const markdown = doc.markdown ?? "";
