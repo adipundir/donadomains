@@ -117,8 +117,8 @@ async function firecrawlScrapeInner(
   waitMs: number,
   apiKey: string,
 ): Promise<FirecrawlScrapeResult> {
-  const MAX_RETRIES = 1;
-  const BACKOFF = [1000];
+  const MAX_RETRIES = 2;
+  const BACKOFF = [1500, 3000];
 
   let lastError = "";
   let bestResult: FirecrawlScrapeResult | null = null;
