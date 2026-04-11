@@ -10,7 +10,7 @@ import type { SourceStatus, DomainResult } from "@/app/lib/domain-scraper";
 import { probeDns } from "@/app/lib/domain-intel";
 import { checkApiRateLimit, getClientIp } from "@/app/lib/api-rate-limit";
 
-const REGISTRAR_TIMEOUT_MS = 15_000;
+const REGISTRAR_TIMEOUT_MS = 55_000;
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

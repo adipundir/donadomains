@@ -119,17 +119,20 @@ async function firecrawlScrapeInner(
 ): Promise<FirecrawlScrapeResult> {
   const MAX_RETRIES = 2;
   const BACKOFF = [1500, 3000];
+  const tag = url.replace(/^https?:\/\/(?:www\.)?/, "").split("/")[0]; // e.g. "godaddy.com"
 
   let lastError = "";
   let bestResult: FirecrawlScrapeResult | null = null;
+  const totalStart = Date.now();
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     if (attempt > 0) {
       const delay = BACKOFF[Math.min(attempt - 1, BACKOFF.length - 1)];
-      console.log(`[Firecrawl] Retry #${attempt} for ${url} after ${delay}ms (${lastError.slice(0, 60)})`);
+      console.log(`[Firecrawl] ${tag} attempt ${attempt + 1}/${MAX_RETRIES + 1} — retrying in ${delay}ms (reason: ${lastError.slice(0, 80)})`);
       await new Promise((r) => setTimeout(r, delay));
     }
 
+    const attemptStart = Date.now();
     try {
       const fc = getFirecrawlClient(apiKey);
       const doc = await fc.scrape(url, {
@@ -141,6 +144,7 @@ async function firecrawlScrapeInner(
       const markdown = doc.markdown ?? "";
       const lineCount = markdown.split("\n").filter((l) => l.trim()).length;
       const statusCode = doc.metadata?.statusCode;
+      const attemptMs = Date.now() - attemptStart;
 
       const result: FirecrawlScrapeResult = {
         success: true,
@@ -153,6 +157,7 @@ async function firecrawlScrapeInner(
       // If we got markdown but it's suspiciously short, the page might not
       // have fully rendered. Keep it as our best result but retry once.
       if (lineCount < MIN_USEFUL_LINES) {
+        console.log(`[Firecrawl] ${tag} attempt ${attempt + 1}/${MAX_RETRIES + 1} — ${lineCount} lines in ${attemptMs}ms (too few, will retry)`);
         if (!bestResult || (bestResult.lineCount ?? 0) < lineCount) {
           bestResult = result;
         }
@@ -160,19 +165,28 @@ async function firecrawlScrapeInner(
         continue;
       }
 
+      console.log(`[Firecrawl] ${tag} attempt ${attempt + 1}/${MAX_RETRIES + 1} — OK, ${lineCount} lines in ${attemptMs}ms (total ${Date.now() - totalStart}ms)`);
       return result;
     } catch (err) {
       const message = (err as Error).message ?? "unknown error";
+      const attemptMs = Date.now() - attemptStart;
+      console.log(`[Firecrawl] ${tag} attempt ${attempt + 1}/${MAX_RETRIES + 1} — FAILED in ${attemptMs}ms: ${message.slice(0, 100)}`);
       lastError = message;
 
       // Only retry on transient errors
       if (!isRetryable(message)) {
+        console.log(`[Firecrawl] ${tag} — non-retryable error, giving up after ${Date.now() - totalStart}ms`);
         return { success: false, error: message };
       }
     }
   }
 
   // Return the best result we got (even if sparse), or an error
-  if (bestResult) return bestResult;
+  const totalMs = Date.now() - totalStart;
+  if (bestResult) {
+    console.log(`[Firecrawl] ${tag} — exhausted ${MAX_RETRIES + 1} attempts in ${totalMs}ms, returning best result (${bestResult.lineCount} lines)`);
+    return bestResult;
+  }
+  console.log(`[Firecrawl] ${tag} — exhausted ${MAX_RETRIES + 1} attempts in ${totalMs}ms, all failed: ${lastError.slice(0, 100)}`);
   return { success: false, error: lastError };
 }
