@@ -34,7 +34,7 @@ export const ALL_REGISTRARS: RegistrarModule[] = [
  * which returns availability + pricing for many TLDs at once.
  * This is far more efficient than checking each domain individually.
  */
-const SEARCH_TIMEOUT_MS = 40_000;
+const SEARCH_TIMEOUT_MS = 55_000;
 
 export async function searchAllRegistrars(query: string): Promise<RegistrarSearchResult[]> {
   const results = await Promise.all(
