@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "next-themes";
-import { fetchDomainIntelAction, notifyDomainAction } from "./actions";
-import type { DomainIntel, DomainResult, DomainRegistrationDetails, BuyLink } from "./types";
+import { fetchDomainIntelAction, notifyDomainAction, valuateDomainAction } from "./actions";
+import type { DomainIntel, DomainResult, DomainRegistrationDetails, BuyLink, DomainValuation } from "./types";
 
 function ThemeSwitcher() {
   const { setTheme, resolvedTheme } = useTheme();
@@ -95,6 +95,53 @@ function ListIcon({ className }: { className?: string }) {
     <svg className={className} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
     </svg>
+  );
+}
+
+const TIER_COLORS = {
+  common: "border-[var(--border-light)] text-[var(--foreground)]/60",
+  decent: "border-blue-400 text-blue-500",
+  premium: "border-purple-400 text-purple-500",
+  ultra: "border-amber-400 text-amber-500",
+} as const;
+
+const TIER_BG = {
+  common: "bg-[var(--surface-muted)]",
+  decent: "bg-blue-50 dark:bg-blue-950/20",
+  premium: "bg-purple-50 dark:bg-purple-950/20",
+  ultra: "bg-amber-50 dark:bg-amber-950/20",
+} as const;
+
+function ValuationDisplay({ valuation }: { valuation: DomainValuation }) {
+  return (
+    <div className={`mt-3 p-3 border-2 ${TIER_COLORS[valuation.tier]} ${TIER_BG[valuation.tier]}`}>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <div className="flex items-center gap-2">
+          <span className="font-comic-title text-2xl">{valuation.score}</span>
+          <span className="font-comic-title text-[10px] uppercase tracking-widest opacity-60">/100</span>
+          <span className={`font-comic-title text-xs uppercase tracking-wide px-2 py-0.5 border ${TIER_COLORS[valuation.tier]}`}>
+            {valuation.tier}
+          </span>
+        </div>
+        <span className="font-comic-title text-sm tracking-wide">{valuation.estimatedValue}</span>
+      </div>
+      <p className="font-comic-body text-xs opacity-70 mb-2">{valuation.reasoning}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {valuation.factors.map((f) => (
+          <span
+            key={f.label}
+            className={`font-comic-body text-[10px] font-bold px-1.5 py-0.5 border ${
+              f.impact === "positive" ? "border-green-300 text-green-600 dark:text-green-400" :
+              f.impact === "negative" ? "border-red-300 text-red-500 dark:text-red-400" :
+              "border-[var(--border-light)] opacity-60"
+            }`}
+            title={f.detail}
+          >
+            {f.impact === "positive" ? "+" : f.impact === "negative" ? "-" : "·"} {f.label}
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -483,6 +530,7 @@ export default function Home() {
   const [intelDomain, setIntelDomain] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [registrarStatuses, setRegistrarStatuses] = useState<Record<string, RegistrarStatus>>({});
+  const [valuations, setValuations] = useState<Record<string, { loading: boolean; valuation?: DomainValuation; error?: string }>>({});
   const searchAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -494,6 +542,26 @@ export default function Home() {
   const scrollToTop = useCallback(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
+
+  const handleValuate = useCallback(async (domain: string, result: DomainResult) => {
+    // Toggle off if already shown
+    if (valuations[domain]?.valuation) {
+      setValuations((prev) => { const next = { ...prev }; delete next[domain]; return next; });
+      return;
+    }
+    setValuations((prev) => ({ ...prev, [domain]: { loading: true } }));
+    const cheapest = result.buyLinks?.find((l) => l.isCheapest);
+    const res = await valuateDomainAction(domain, {
+      registered: !result.available,
+      isPremium: result.buyLinks?.some((l) => l.premium),
+      registrationPrice: cheapest?.priceNum,
+    });
+    if (res.success && res.valuation) {
+      setValuations((prev) => ({ ...prev, [domain]: { loading: false, valuation: res.valuation } }));
+    } else {
+      setValuations((prev) => ({ ...prev, [domain]: { loading: false, error: res.error || "Failed" } }));
+    }
+  }, [valuations]);
 
   const handleSearch = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -645,15 +713,29 @@ export default function Home() {
           )}
         </div>
 
-        {!result.available && (
+        <div className="shrink-0 flex items-center gap-2">
           <button
             type="button"
-            onClick={() => setIntelDomain(result.domain)}
-            className="shrink-0 font-comic-title px-3 py-1.5 text-xs uppercase border-2 border-[var(--border)] tracking-wide bg-[var(--surface)] hover:bg-[var(--foreground)] hover:text-[var(--surface)] transition-colors whitespace-nowrap"
+            onClick={() => handleValuate(result.domain, result)}
+            disabled={valuations[result.domain]?.loading}
+            className={`shrink-0 font-comic-title px-3 py-1.5 text-xs uppercase tracking-wide border-2 transition-all ${
+              valuations[result.domain]?.valuation
+                ? "border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)]"
+                : "border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--foreground)] hover:text-[var(--surface)]"
+            } disabled:opacity-50`}
           >
-            More Details
+            {valuations[result.domain]?.loading ? "Evaluating..." : valuations[result.domain]?.valuation ? "Hide Evaluation" : "Evaluate"}
           </button>
-        )}
+          {!result.available && (
+            <button
+              type="button"
+              onClick={() => setIntelDomain(result.domain)}
+              className="shrink-0 font-comic-title px-3 py-1.5 text-xs uppercase border-2 border-[var(--border)] tracking-wide bg-[var(--surface)] hover:bg-[var(--foreground)] hover:text-[var(--surface)] transition-colors whitespace-nowrap"
+            >
+              More Details
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Buy links for available domains */}
@@ -696,6 +778,16 @@ export default function Home() {
         <div className="mt-3 pt-3 border-t border-[var(--border-light)]">
           <p className="font-comic-body text-sm opacity-60">This domain is taken.</p>
         </div>
+      )}
+
+      {/* Valuation result */}
+      {valuations[result.domain]?.valuation && (
+        <div className="mt-2">
+          <ValuationDisplay valuation={valuations[result.domain].valuation!} />
+        </div>
+      )}
+      {valuations[result.domain]?.error && (
+        <p className="font-comic-body text-xs text-red-400 font-bold mt-2">{valuations[result.domain].error}</p>
       )}
     </div>
   );
@@ -773,7 +865,28 @@ export default function Home() {
               More Details
             </button>
           ) : null}
+          <button
+            type="button"
+            onClick={() => handleValuate(result.domain, result)}
+            disabled={valuations[result.domain]?.loading}
+            className={`font-comic-title px-2.5 py-1 text-xs uppercase tracking-wide transition-colors ${
+              valuations[result.domain]?.valuation
+                ? "border border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)]"
+                : "border border-[var(--border-light)] hover:border-[var(--border)]"
+            } disabled:opacity-50`}
+          >
+            {valuations[result.domain]?.loading ? "..." : valuations[result.domain]?.valuation ? "Hide" : "Evaluate"}
+          </button>
         </div>
+        {/* Valuation result row */}
+        {valuations[result.domain]?.valuation && (
+          <div className="sm:col-span-full w-full">
+            <ValuationDisplay valuation={valuations[result.domain].valuation!} />
+          </div>
+        )}
+        {valuations[result.domain]?.error && (
+          <p className="font-comic-body text-xs text-red-400 font-bold sm:col-span-full">{valuations[result.domain].error}</p>
+        )}
       </div>
     );
   };

@@ -98,6 +98,28 @@ export const searchLogs = pgTable(
   ],
 );
 
+// ─── Domain Valuations (cache) ──────────────────────────────────────────────
+
+export const domainValuations = pgTable(
+  "domain_valuations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    domain: text("domain").notNull(),
+    score: integer("score").notNull(),
+    tier: text("tier").$type<"common" | "decent" | "premium" | "ultra">().notNull(),
+    estimatedValue: text("estimated_value").notNull(),
+    reasoning: text("reasoning").notNull(),
+    factors: jsonb("factors")
+      .$type<Array<{ label: string; impact: "positive" | "negative" | "neutral"; detail: string }>>()
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("domain_valuation_unique").on(table.domain),
+    index("domain_valuations_created_at_idx").on(table.createdAt),
+  ],
+);
+
 // ─── Rate Limits ─────────────────────────────────────────────────────────────
 
 export const rateLimits = pgTable("rate_limits", {

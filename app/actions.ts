@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import { fetchRdapDetails } from "@/app/lib/domain-scraper";
 import { fetchDomainIntel } from "@/app/lib/domain-intel";
 import type { DomainIntel } from "@/app/lib/domain-intel";
+import { valuateDomain } from "@/app/lib/domain-valuation";
+import type { DomainValuation } from "@/app/lib/domain-valuation";
 import { createWatch, verifyWatch, unsubscribeWatch, getWatchesByEmail } from "@/app/lib/watch/store";
 import { checkRateLimit } from "@/app/lib/watch/rate-limit";
 import { sendVerificationEmail } from "@/app/lib/watch/notify";
@@ -133,5 +135,67 @@ export async function getNotificationsAction(email: string): Promise<{ success: 
   } catch (err) {
     console.error("[Notify] list failed:", err);
     return { success: false, watches: [], error: "Failed to fetch notifications" };
+  }
+}
+
+// ─── Domain Valuation Actions ───────────────────────────────────────────────
+
+export interface ValuationResult {
+  success: boolean;
+  valuation?: DomainValuation;
+  error?: string;
+}
+
+export async function valuateDomainAction(
+  domain: string,
+  context?: {
+    registered?: boolean;
+    isPremium?: boolean;
+    registrationPrice?: number;
+  },
+): Promise<ValuationResult> {
+  const d = domain.trim().toLowerCase();
+  if (!DOMAIN_RE.test(d)) return { success: false, error: "Invalid domain name" };
+
+  try {
+    // Gather intel for richer valuation
+    let created: string | undefined;
+    let expires: string | undefined;
+    let registrar: string | undefined;
+    let nameservers: string[] | undefined;
+    let dnsResolves: boolean | undefined;
+    let registered = context?.registered ?? false;
+
+    try {
+      const intel = await fetchDomainIntel(d);
+      created = intel.created;
+      expires = intel.expires;
+      registrar = intel.registrar;
+      nameservers = intel.nameservers;
+      dnsResolves = intel.registered;
+      registered = intel.registered;
+    } catch {
+      // Intel failure is non-fatal — valuate with what we have
+    }
+
+    const valuation = await valuateDomain({
+      domain: d,
+      registered,
+      isPremium: context?.isPremium,
+      registrationPrice: context?.registrationPrice,
+      created,
+      expires,
+      registrar,
+      nameservers,
+      dnsResolves,
+    });
+
+    return { success: true, valuation };
+  } catch (err) {
+    console.error("[Valuation] failed:", err);
+    return {
+      success: false,
+      error: "Unable to evaluate this domain right now. Please try again later.",
+    };
   }
 }
