@@ -1,5 +1,6 @@
 import { searchAllRegistrars, buildMergedBuyLinks } from "./registrars";
 import type { BuyLink, RegistrarSearchHit } from "./registrars";
+import { loadRdapBootstrap } from "./rdap-bootstrap";
 
 export interface DomainRegistrationDetails {
   registrar?: string;
@@ -189,46 +190,12 @@ export function buildSearchResults(
 }
 
 // ─── RDAP Bootstrap ─────────────────────────────────────────────────────────
+//
+// The TLD → RDAP server map is loaded by `app/lib/rdap-bootstrap.ts` and
+// cached in Postgres (7-day TTL) for instant warm starts on serverless.
 
-const IANA_BOOTSTRAP_URL = "https://data.iana.org/rdap/dns.json";
-const RDAP_DIRECT_TIMEOUT_MS = 3000;
 const RDAP_FALLBACK_TIMEOUT_MS = 5000;
 const RDAP_DETAILS_TIMEOUT_MS = 4000;
-
-let bootstrapCache: Map<string, string> | null = null;
-let bootstrapPromise: Promise<Map<string, string>> | null = null;
-
-const RDAP_FALLBACK_TLDS: Record<string, string> = {
-  com: "https://rdap.verisign.com/com/v1/",
-  net: "https://rdap.verisign.com/net/v1/",
-  org: "https://rdap.publicinterestregistry.org/",
-};
-
-async function loadBootstrap(): Promise<Map<string, string>> {
-  if (bootstrapCache) return bootstrapCache;
-  if (bootstrapPromise) return bootstrapPromise;
-  bootstrapPromise = (async () => {
-    const map = new Map<string, string>(Object.entries(RDAP_FALLBACK_TLDS));
-    try {
-      const res = await fetch(IANA_BOOTSTRAP_URL, { signal: AbortSignal.timeout(10000) });
-      if (!res.ok) return map;
-      const data = (await res.json()) as { services?: [string[], string[]][] };
-      for (const [tlds, urls] of data.services ?? []) {
-        if (!Array.isArray(tlds) || !Array.isArray(urls)) continue;
-        for (let i = 0; i < tlds.length; i++) {
-          const tld = String(tlds[i]).toLowerCase();
-          const url = urls[i] ?? urls[0];
-          if (tld && url) map.set(tld, url.endsWith("/") ? url : `${url}/`);
-        }
-      }
-      bootstrapCache = map;
-      return map;
-    } catch {
-      return map;
-    }
-  })();
-  return bootstrapPromise;
-}
 
 function extractTld(domain: string): string {
   const parts = domain.split(".");
@@ -243,7 +210,7 @@ const LOG_RDAP = process.env.LOG_RDAP === "1";
 
 async function rdapFetch(domain: string, timeoutMs: number): Promise<Response> {
   const tldKey = tldToKey(extractTld(domain));
-  const bootstrap = await loadBootstrap();
+  const bootstrap = await loadRdapBootstrap();
   const baseUrl = bootstrap.get(tldKey);
   const directUrl = baseUrl ? `${baseUrl}domain/${domain}` : null;
   const rdapOrgUrl = `https://rdap.org/domain/${domain}`;

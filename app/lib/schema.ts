@@ -128,3 +128,60 @@ export const rateLimits = pgTable("rate_limits", {
   windowStart: timestamp("window_start").defaultNow().notNull(),
   expiresAt: timestamp("expires_at").notNull(),
 });
+
+// ─── Domain Intel Cache ─────────────────────────────────────────────────────
+
+/**
+ * Cached DomainIntel responses. TTL is calculated based on the result:
+ *  - Fully registered with all fields  → 24h
+ *  - Registered but partial            → 6h
+ *  - Unregistered (NXDOMAIN)           → 1h
+ *  - Pending-delete / near expiry      → 1h
+ *  - Error / no data                   → 5min
+ */
+export const domainIntelCache = pgTable(
+  "domain_intel_cache",
+  {
+    domain: text("domain").primaryKey(),
+    intel: jsonb("intel").notNull(),
+    registered: boolean("registered").notNull(),
+    fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+  },
+  (table) => [
+    index("domain_intel_expires_idx").on(table.expiresAt),
+  ],
+);
+
+// ─── WHOIS Server Map (TLD → port-43 server) ───────────────────────────────
+
+/**
+ * TLD → WHOIS server discovered via `whois.iana.org`. 30-day TTL.
+ * Empty `server` string means "no WHOIS server exists for this TLD" — cached
+ * so we don't re-query IANA for every unsupported TLD.
+ */
+export const whoisServers = pgTable(
+  "whois_servers",
+  {
+    tld: text("tld").primaryKey(),
+    server: text("server").notNull(), // "" means known-empty
+    fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+  },
+  (table) => [
+    index("whois_servers_expires_idx").on(table.expiresAt),
+  ],
+);
+
+// ─── RDAP Bootstrap Cache ───────────────────────────────────────────────────
+
+/**
+ * IANA RDAP bootstrap (https://data.iana.org/rdap/dns.json) cached for 7 days.
+ * Key is the bootstrap kind (`dns`, `ipv4`, `ipv6`, `asn`); we only use `dns`.
+ */
+export const rdapBootstrapCache = pgTable("rdap_bootstrap_cache", {
+  key: text("key").primaryKey(),
+  data: jsonb("data").notNull(),
+  fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+});

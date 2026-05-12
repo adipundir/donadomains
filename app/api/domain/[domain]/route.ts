@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { fetchDomainIntel } from "@/app/lib/domain-intel";
+import { fetchDomainIntelWithMeta } from "@/app/lib/domain-intel";
 import { checkApiRateLimit, getClientIp } from "@/app/lib/api-rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -29,14 +29,19 @@ export async function GET(
   }
 
   try {
-    const intel = await Promise.race([
-      fetchDomainIntel(normalized),
+    const meta = await Promise.race([
+      fetchDomainIntelWithMeta(normalized),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("timeout")), TIMEOUT_MS),
       ),
     ]);
 
-    return NextResponse.json(intel);
+    return NextResponse.json(meta.intel, {
+      headers: {
+        "X-Cache": meta.cacheHit ? "HIT" : "MISS",
+        "X-Cache-Age": String(Math.floor(meta.ageMs / 1000)),
+      },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
 

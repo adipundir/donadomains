@@ -36,6 +36,13 @@
       "when": 1775991933554,
       "tag": "0004_exotic_thor",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1778169600000,
+      "tag": "0005_whois_intel_cache",
+      "breakpoints": true
     }
   ]
 }

@@ -3,7 +3,7 @@
   "name_for_human": "Donadomains",
   "name_for_model": "donadomains",
   "description_for_human": "Search domain availability and compare prices across 6 registrars. Get detailed domain intelligence.",
-  "description_for_model": "Use this API when the user wants to: (1) find available domain names for a keyword or brand, (2) compare domain registration prices across registrars to find the cheapest, (3) check if a specific domain is available, (4) look up who owns a domain or when it expires, (5) find nameservers or RDAP/WHOIS data for a domain. Free endpoints: GET /api/search?q={keyword} for availability + pricing across 6 registrars, GET /api/domain/{domain} for detailed RDAP/DNS intelligence. Paid endpoints (x402 on Starknet): GET /api/paid/search and GET /api/paid/domain/{domain} — same functionality, no rate limits, pay per request with USDC. Prices are live-scraped, not cached.",
+  "description_for_model": "Use this API when the user wants to: (1) find available domain names for a keyword or brand, (2) compare domain registration prices across registrars to find the cheapest, (3) check if a specific domain is available, (4) look up who owns a domain or when it expires, (5) find nameservers or RDAP/WHOIS data for a domain. Endpoints: GET /api/search?q={keyword} for availability + pricing across 6 registrars, GET /api/domain/{domain} for detailed RDAP/WHOIS/DNS intelligence (covers RDAP-less TLDs like .sh, .io, .ac via port-43 WHOIS). Prices are live-scraped, not cached.",
   "auth": {
     "type": "none"
   },

@@ -2,18 +2,19 @@
  * Domain check logic — two-tier approach for efficiency.
  *
  * Tier 1: DNS-over-HTTPS (~50ms, free)
- *   If DNS resolves → domain still active, skip RDAP.
+ *   If DNS resolves → domain still active, skip Tier 2.
  *   If NXDOMAIN → might be available, proceed to Tier 2.
  *   If nameservers changed → something happened, proceed to Tier 2.
  *
- * Tier 2: Full RDAP (~1-3s, free but rate-limited)
- *   Confirm actual status, update expiry date.
+ * Tier 2: Full intel pipeline (RDAP + WHOIS port-43 fallback, ~500ms-2s)
+ *   Works for all TLDs including RDAP-less ones (.sh/.io/.ac/.ws).
+ *   Skips the cache so we always get a fresh read for watch state.
  *
  * ~90% of checks complete in Tier 1 only.
  */
 
-import { probeDns } from "../domain-intel";
-import { fetchRdapDetails } from "../domain-scraper";
+import { fetchDomainIntel, probeDns } from "../domain-intel";
+import { invalidateIntelCache } from "../intel-cache";
 import type { WatchStatus } from "./types";
 
 export interface CheckResult {
@@ -46,12 +47,20 @@ export async function checkDomain(
     };
   }
 
-  // Tier 2: Something changed (NXDOMAIN, NS change, or new watch) — full RDAP check
-  const rdap = await fetchRdapDetails(domain);
+  // Tier 2: Something changed — fresh full-intel check via the layered pipeline
+  // (RDAP for TLDs that support it, WHOIS port-43 otherwise, who.is as last resort).
+  // Skip the read cache so the watch system always sees current state. Also blow
+  // away any stale cache entry so user-facing queries pick up the change.
+  const intel = await fetchDomainIntel(domain, { skipCache: true, skipPersist: true });
+  void invalidateIntelCache(domain);
 
-  if (!rdap) {
-    // RDAP returned nothing — if DNS also says NXDOMAIN, domain is likely available
-    if (!dns.resolves) {
+  const hasRegistrationData = Boolean(
+    intel.registrar || intel.created || intel.expires || (intel.status && intel.status.length),
+  );
+
+  if (!hasRegistrationData) {
+    // Pipeline returned nothing — if DNS also says NXDOMAIN, domain is likely available
+    if (!dns.resolves && !intel.registered) {
       return {
         status: "available",
         nameservers: [],
@@ -59,7 +68,7 @@ export async function checkDomain(
         changed: previousStatus !== "available",
       };
     }
-    // DNS resolves but RDAP failed — keep previous status
+    // DNS resolves but registration sources failed — keep previous status
     return {
       status: previousStatus,
       nameservers: dns.nameservers.length > 0 ? dns.nameservers : previousNameservers,
@@ -68,16 +77,16 @@ export async function checkDomain(
     };
   }
 
-  // Determine status from RDAP
+  // Determine status from intel
   let status: WatchStatus = "registered";
-  const statuses = rdap.status ?? [];
+  const statuses = intel.status ?? [];
 
-  if (statuses.some((s) => s.includes("pendingDelete"))) {
+  if (statuses.some((s) => s.toLowerCase().includes("pendingdelete"))) {
     status = "pendingDelete";
-  } else if (statuses.some((s) => s.includes("redemption"))) {
+  } else if (statuses.some((s) => s.toLowerCase().includes("redemption"))) {
     status = "pendingDelete"; // Treat redemption as pending delete
-  } else if (rdap.expires) {
-    const expiry = new Date(rdap.expires).getTime();
+  } else if (intel.expires) {
+    const expiry = new Date(intel.expires).getTime();
     if (!isNaN(expiry) && expiry < Date.now()) {
       status = "expired";
     }
@@ -85,8 +94,12 @@ export async function checkDomain(
 
   return {
     status,
-    nameservers: dns.nameservers.length > 0 ? dns.nameservers : previousNameservers,
-    expiresAt: rdap.expires ?? null,
+    nameservers: (intel.nameservers && intel.nameservers.length > 0)
+      ? intel.nameservers
+      : dns.nameservers.length > 0
+        ? dns.nameservers
+        : previousNameservers,
+    expiresAt: intel.expires ?? null,
     changed: status !== previousStatus || nsChanged,
   };
 }

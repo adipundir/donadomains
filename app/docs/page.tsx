@@ -127,13 +127,9 @@ const EXAMPLE_SEARCH_JSON = `{
 }`;
 
 const NAV_ITEMS = [
-  { id: "free-api", label: "Free API", heading: true },
+  { id: "free-api", label: "API", heading: true },
   { id: "domain-search", label: "Search" },
   { id: "domain-info", label: "Info" },
-  { id: "paid-api", label: "Paid API (x402)", heading: true },
-  { id: "paid-search", label: "Search" },
-  { id: "paid-domain", label: "Info" },
-  { id: "paid-setup", label: "Setup" },
   { id: "rate-limits", label: "Rate Limits" },
 ];
 
@@ -177,8 +173,7 @@ export default function DocsPage() {
             </h1>
             <p className="font-comic-body text-base opacity-70 max-w-2xl">
               Free, unauthenticated API for domain search and intelligence.
-              Search across 6 registrars for live pricing, or look up detailed RDAP/DNS info for any domain.
-              Also available as a paid API via the x402 payment protocol on Starknet — no API keys, just pay-per-request.
+              Search across 6 registrars for live pricing, or look up detailed RDAP/WHOIS/DNS info for any domain.
             </p>
           </div>
 
@@ -186,7 +181,7 @@ export default function DocsPage() {
           <div id="free-api" className="scroll-mt-24" />
           <div className="rounded-lg p-5 space-y-4" style={{ background: "var(--surface)", border: "2px solid var(--border-light)" }}>
             <div>
-              <p className="font-comic-title text-lg uppercase tracking-wide">2 Free Endpoints + 2 Paid (x402)</p>
+              <p className="font-comic-title text-lg uppercase tracking-wide">2 Endpoints</p>
             </div>
             <div className="p-3 rounded-lg" style={{ background: "var(--surface-muted)" }}>
               <p className="font-comic-title text-[10px] uppercase tracking-widest opacity-50 mb-1">Base URL</p>
@@ -215,33 +210,6 @@ export default function DocsPage() {
                   <p className="font-comic-body text-sm opacity-70 mt-0.5">Look up detailed info for a single domain — registrar, dates, owner, nameservers, status.</p>
                 </div>
               </a>
-            </div>
-            <div className="mt-3">
-              <p className="font-comic-title text-[10px] uppercase tracking-widest opacity-50 mb-2">Paid Endpoints (x402 on Starknet)</p>
-              <div className="space-y-2">
-                <a
-                  href="#paid-api"
-                  className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:opacity-80"
-                  style={{ background: "var(--surface-muted)" }}
-                >
-                  <Badge>x402</Badge>
-                  <div>
-                    <code className="text-sm font-bold">/api/paid/search?q=&#123;keyword&#125;</code>
-                    <p className="font-comic-body text-sm opacity-70 mt-0.5">Same as /api/search — no rate limits, pay 0.01 USDC per request via Starknet.</p>
-                  </div>
-                </a>
-                <a
-                  href="#paid-api"
-                  className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:opacity-80"
-                  style={{ background: "var(--surface-muted)" }}
-                >
-                  <Badge>x402</Badge>
-                  <div>
-                    <code className="text-sm font-bold">/api/paid/domain/&#123;domain&#125;</code>
-                    <p className="font-comic-body text-sm opacity-70 mt-0.5">Same as /api/domain — no rate limits, pay 0.005 USDC per request via Starknet.</p>
-                  </div>
-                </a>
-              </div>
             </div>
           </div>
 
@@ -513,162 +481,18 @@ print(intel["sources"])      # ["rdap", "dns"]` },
             </p>
             <ol className="list-decimal list-inside space-y-2 mt-2 opacity-80">
               <li>
-                <strong>RDAP</strong> — Registration Data Access Protocol. Free, HTTP-based. Provides registrar, dates, status, and contact info.
+                <strong>RDAP</strong> — Registration Data Access Protocol. Free, HTTP-based. Used for TLDs that publish an RDAP server (most gTLDs).
+              </li>
+              <li>
+                <strong>WHOIS port-43</strong> — Classic port-43 WHOIS. Used for TLDs without RDAP (e.g. <code>.sh</code>, <code>.io</code>, <code>.ac</code>) and as a fallback when RDAP returns incomplete data.
               </li>
               <li>
                 <strong>DNS-over-HTTPS</strong> — Cloudflare DoH queries. Fast (~50ms). Resolves nameservers and confirms resolution.
               </li>
               <li>
-                <strong>who.is scrape</strong> — Firecrawl-powered fallback. Only triggered when RDAP returns almost no data. Used sparingly.
+                <strong>who.is scrape</strong> — Firecrawl-powered last-resort fallback. Only fires when the registered domain still has no registrar/dates after the layers above.
               </li>
             </ol>
-          </Section>
-
-          {/* ── Paid API (x402) ── */}
-          <Section id="paid-api" title="Paid API (x402)">
-            <div
-              className="rounded-lg p-4 comic-border-subtle"
-              style={{ background: "var(--surface)" }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Badge>x402</Badge>
-                <Badge color="green">Starknet</Badge>
-              </div>
-              <p className="opacity-80 mb-3">
-                The same endpoints are available as paid, rate-limit-free versions using the{" "}
-                <strong>x402 payment protocol</strong> on Starknet.
-                No API keys needed — your Starknet wallet signs a payment per request, and gas is sponsored via AVNU paymaster.
-              </p>
-            </div>
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">How It Works</h3>
-            <ol className="list-decimal list-inside space-y-2 opacity-80">
-              <li>Request hits <code>/api/paid/*</code> → server returns <strong>402 Payment Required</strong> with payment details in the <code>PAYMENT-REQUIRED</code> header.</li>
-              <li>Your client signs an <strong>OutsideExecution</strong> (SNIP-9) containing a USDC transfer, built via AVNU paymaster (gas-free).</li>
-              <li>Client retries with the <strong>PAYMENT-SIGNATURE</strong> header → server verifies and settles on-chain → returns data + tx hash.</li>
-            </ol>
-          </Section>
-
-          {/* ── Paid Search ── */}
-          <Section id="paid-search" title="Paid Search">
-            <div
-              className="rounded-lg p-4 comic-border-subtle"
-              style={{ background: "var(--surface)" }}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <MethodBadge method="GET" />
-                <code className="text-base font-bold">/api/paid/search?q=&#123;keyword&#125;</code>
-                <Badge>0.01 USDC</Badge>
-              </div>
-              <p className="opacity-70 text-sm">
-                Same as <code>/api/search</code> — searches domain availability across 6 registrars with live pricing.
-                JSON response only (no SSE streaming). No rate limits.
-              </p>
-            </div>
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">Example</h3>
-            <TabbedCode tabs={[
-              { label: "x402axios", code: `import { x402axios } from 'starknet-x402';
-import { Account, RpcProvider } from 'starknet';
-
-const provider = new RpcProvider({
-  nodeUrl: process.env.STARKNET_RPC_URL
-});
-const account = new Account(provider, address, privateKey);
-
-const result = await x402axios.get(
-  'https://donadomains.xyz/api/paid/search?q=myproject',
-  { account, network: 'starknet-sepolia' }
-);
-
-console.log(result.data);                    // { keyword, tld, results, sources }
-console.log(result.settlement?.transaction); // tx hash on Starknet` },
-              { label: "fetch", code: `import { payAndRequest } from 'starknet-x402';
-import { Account, RpcProvider } from 'starknet';
-
-const provider = new RpcProvider({
-  nodeUrl: process.env.STARKNET_RPC_URL
-});
-const account = new Account(provider, address, privateKey);
-
-const response = await payAndRequest(
-  'https://donadomains.xyz/api/paid/search?q=myproject',
-  account,
-  { network: 'starknet-sepolia' }
-);
-
-const data = await response.json();
-console.log(data); // { keyword, tld, results, sources }` },
-            ]} />
-
-            <p className="opacity-60 text-sm mt-3">
-              Response schema is identical to <a href="#domain-search" className="underline" style={{ color: "var(--accent)" }}>/api/search</a> — see the free API docs for field definitions.
-            </p>
-          </Section>
-
-          {/* ── Paid Domain Info ── */}
-          <Section id="paid-domain" title="Paid Domain Info">
-            <div
-              className="rounded-lg p-4 comic-border-subtle"
-              style={{ background: "var(--surface)" }}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <MethodBadge method="GET" />
-                <code className="text-base font-bold">/api/paid/domain/&#123;domain&#125;</code>
-                <Badge>0.005 USDC</Badge>
-              </div>
-              <p className="opacity-70 text-sm">
-                Same as <code>/api/domain/&#123;domain&#125;</code> — returns RDAP, DNS, and registrar intelligence for a single domain. No rate limits.
-              </p>
-            </div>
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">Example</h3>
-            <TabbedCode tabs={[
-              { label: "x402axios", code: `import { x402axios } from 'starknet-x402';
-import { Account, RpcProvider } from 'starknet';
-
-const provider = new RpcProvider({
-  nodeUrl: process.env.STARKNET_RPC_URL
-});
-const account = new Account(provider, address, privateKey);
-
-const result = await x402axios.get(
-  'https://donadomains.xyz/api/paid/domain/github.com',
-  { account, network: 'starknet-sepolia' }
-);
-
-console.log(result.data);                    // domain intel
-console.log(result.settlement?.transaction); // tx hash` },
-              { label: "fetch", code: `import { payAndRequest } from 'starknet-x402';
-import { Account, RpcProvider } from 'starknet';
-
-const provider = new RpcProvider({
-  nodeUrl: process.env.STARKNET_RPC_URL
-});
-const account = new Account(provider, address, privateKey);
-
-const response = await payAndRequest(
-  'https://donadomains.xyz/api/paid/domain/github.com',
-  account,
-  { network: 'starknet-sepolia' }
-);
-
-const data = await response.json();
-console.log(data); // { domain, registered, registrar, expires, ... }` },
-            ]} />
-
-            <p className="opacity-60 text-sm mt-3">
-              Response schema is identical to <a href="#domain-info" className="underline" style={{ color: "var(--accent)" }}>/api/domain/&#123;domain&#125;</a> — see the free API docs for field definitions.
-            </p>
-          </Section>
-
-          {/* ── Paid Setup ── */}
-          <Section id="paid-setup" title="Setup">
-            <CodeBlock title="Install">{`npm install starknet-x402`}</CodeBlock>
-            <p className="opacity-70 text-sm mt-3">
-              The SDK handles the full 402 flow automatically — no manual header construction needed.
-              USDC on Starknet Sepolia for testing, mainnet for production. Gas is sponsored by AVNU paymaster.
-            </p>
           </Section>
 
           {/* Rate Limits */}
@@ -677,15 +501,12 @@ console.log(data); // { domain, registered, registrar, expires, ... }` },
               className="rounded-lg p-4 comic-border-subtle"
               style={{ background: "var(--surface)" }}
             >
-              <div className="flex items-center gap-2 mb-3">
-                <Badge color="accent">FREE API</Badge>
-              </div>
               <p className="opacity-80 mb-3">
-                The free API is rate-limited per IP address to keep things fair:
+                The API is rate-limited per IP address to keep things fair:
               </p>
               <div className="rounded-lg overflow-hidden mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
                 <FieldRow name="/api/search" type="20 req/hr" desc="Each search scrapes 6 registrars — expensive upstream" />
-                <FieldRow name="/api/domain/{domain}" type="60 req/hr" desc="Lightweight RDAP + DNS lookups" />
+                <FieldRow name="/api/domain/{domain}" type="60 req/hr" desc="Lightweight RDAP + WHOIS + DNS lookups" />
               </div>
               <ul className="list-disc list-inside space-y-1.5 opacity-80">
                 <li>Rate limits reset every hour from your first request</li>
@@ -693,19 +514,6 @@ console.log(data); // { domain, registered, registrar, expires, ... }` },
                 <li>The search endpoint may take 5-15 seconds (registrar scraping)</li>
                 <li>The domain info endpoint has a 10 second timeout</li>
               </ul>
-            </div>
-
-            <div
-              className="rounded-lg p-4 mt-4 comic-border-subtle"
-              style={{ background: "var(--surface)" }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Badge>x402 PAID API</Badge>
-              </div>
-              <p className="opacity-80">
-                No rate limits. Pay per request with USDC on Starknet.
-                See the <a href="#paid-api" className="underline" style={{ color: "var(--accent)" }}>Paid API</a> section for details.
-              </p>
             </div>
           </Section>
 
