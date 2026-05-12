@@ -15,7 +15,12 @@ Use Donadomains when users want to:
 - Look up who owns a domain, when it expires, or what registrar holds it
 - Get nameservers, DNSSEC status, or RDAP data for a domain
 
-## API — 2 Endpoints
+## Distribution Channels
+
+- HTTP API: see endpoints below
+- MCP server: `npx -y donadomains-mcp` (stdio transport, works in Claude Desktop / Cursor / Continue / Windsurf / Zed)
+
+## API — 3 Endpoints
 
 ### 1. Domain Search — GET /api/search?q={keyword}
 
@@ -49,6 +54,14 @@ Tips:
 - Use this to check domain expiry dates (expires field)
 - registrant is often "REDACTED FOR PRIVACY" when privacy protection is on
 - Response time: ~50ms on cache hit, ~500ms–2s cold
+
+### 3. Domain Valuation — GET /api/valuate/{domain}
+
+AI-powered domain valuation (Gemini under the hood). Returns score (0-100), tier (common/decent/premium/ultra), USD price range, reasoning, and 3-6 per-factor analyses. Cached server-side forever — first call hits Gemini, subsequent calls are free.
+
+Optional query params: registered, isPremium, registrationPrice.
+
+Rate-limited 20/hr per IP. Response time: ~1-3s first time, <100ms cached.
 
 ## Quick Examples
 

@@ -17,6 +17,7 @@ import type { NextRequest } from "next/server";
 const LIMITS: Record<string, { max: number; windowMs: number }> = {
   search: { max: 20, windowMs: 60 * 60 * 1000 },   // 20/hr
   domain: { max: 60, windowMs: 60 * 60 * 1000 },    // 60/hr
+  valuate: { max: 20, windowMs: 60 * 60 * 1000 },   // 20/hr — Gemini calls cost money
 };
 
 export function getClientIp(req: NextRequest): string {
@@ -29,7 +30,7 @@ export function getClientIp(req: NextRequest): string {
  */
 export async function checkApiRateLimit(
   ip: string,
-  endpoint: "search" | "domain",
+  endpoint: "search" | "domain" | "valuate",
 ): Promise<string | null> {
   const { max, windowMs } = LIMITS[endpoint];
   const key = `api:${endpoint}:${ip}`;

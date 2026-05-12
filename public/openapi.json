@@ -176,8 +176,56 @@
           }
         }
       }
+    },
+    "/api/valuate/{domain}": {
+      "get": {
+        "operationId": "valuateDomain",
+        "summary": "AI-powered domain valuation",
+        "description": "Returns a Gemini-powered valuation for a domain — score (0-100), tier (common/decent/premium/ultra), USD price range, reasoning, and per-factor analysis. Cached in Postgres forever, so repeat valuations are free. Rate-limited 20/hr per IP because Gemini calls cost money.",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*[a-z0-9]\\.[a-z]{2,}$" }
+          },
+          {
+            "name": "registered",
+            "in": "query",
+            "required": false,
+            "description": "Optional hint: pass true/false if you already know the registration state.",
+            "schema": { "type": "boolean" }
+          },
+          {
+            "name": "isPremium",
+            "in": "query",
+            "required": false,
+            "description": "Flag this as a registrar-premium domain (anchors the valuation upward).",
+            "schema": { "type": "boolean" }
+          },
+          {
+            "name": "registrationPrice",
+            "in": "query",
+            "required": false,
+            "description": "Current registration price in USD, if known.",
+            "schema": { "type": "number" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Valuation result",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DomainValuation" }
+              }
+            }
+          },
+          "400": { "description": "Invalid domain format" },
+          "429": { "description": "Rate limit exceeded (20/hr per IP)" },
+          "504": { "description": "Valuation timed out" }
+        }
+      }
     }
-  },
   },
   "components": {
     "schemas": {
@@ -262,10 +310,36 @@
           "contactAddress": { "type": "string", "description": "Registrant postal address — usually partially or fully redacted" },
           "nameservers": { "type": "array", "items": { "type": "string" }, "description": "Authoritative DNS nameservers for the domain" },
           "dnssec": { "type": "string", "description": "DNSSEC status (e.g. \"signedDelegation\", \"unsigned\")" },
-          "sources": { "type": "array", "items": { "type": "string", "enum": ["rdap", "dns", "who.is"] }, "description": "Which data sources were used to gather this intelligence" },
-          "timing": { "type": "object", "additionalProperties": { "type": "number" }, "description": "Milliseconds spent querying each source (e.g. { \"rdap\": 342, \"dns\": 87 })" }
+          "sources": { "type": "array", "items": { "type": "string", "enum": ["rdap", "whois43", "dns", "who.is"] }, "description": "Which data sources were used to gather this intelligence" },
+          "timing": { "type": "object", "additionalProperties": { "type": "number" }, "description": "Milliseconds spent querying each source (e.g. { \"rdap\": 342, \"dns\": 87, \"whois43\": 412 })" },
+          "fetchedAt": { "type": "string", "description": "ISO timestamp of the last fresh fetch (cache-aware)" }
         },
         "required": ["domain", "registered", "sources", "timing"]
+      },
+      "DomainValuation": {
+        "type": "object",
+        "description": "AI-powered domain valuation result.",
+        "properties": {
+          "domain": { "type": "string" },
+          "score": { "type": "number", "minimum": 0, "maximum": 100 },
+          "tier": { "type": "string", "enum": ["common", "decent", "premium", "ultra"] },
+          "estimatedValue": { "type": "string", "description": "Human-readable USD range, e.g. \"$500 - $2,000\"" },
+          "reasoning": { "type": "string", "description": "2-3 sentence explanation of the valuation" },
+          "factors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": { "type": "string" },
+                "impact": { "type": "string", "enum": ["positive", "negative", "neutral"] },
+                "detail": { "type": "string" }
+              },
+              "required": ["label", "impact", "detail"]
+            }
+          },
+          "cached": { "type": "boolean", "description": "true if served from DB cache (Gemini was not called)" }
+        },
+        "required": ["domain", "score", "tier", "estimatedValue", "reasoning", "factors"]
       },
       "Error": {
         "type": "object",

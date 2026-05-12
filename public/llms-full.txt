@@ -5,6 +5,7 @@
 Base URL: https://donadomains.xyz
 Docs: https://donadomains.xyz/docs
 Auth: None — open API rate-limited per IP.
+MCP: For AI clients (Claude Desktop, Cursor, Continue, Windsurf, Zed) install via `npx -y donadomains-mcp`.
 
 ---
 
@@ -230,6 +231,80 @@ if intel["registered"]:
 else:
     print("Domain is available for registration")
 ```
+
+---
+
+## Endpoint 3: Domain Valuation
+
+GET /api/valuate/{domain}
+
+AI-powered domain valuation using Google Gemini. Returns a numeric score, a tier, an estimated USD price range, reasoning, and per-factor analysis (TLD value, length, brandability, keyword strength, age, character composition, etc.). Results are cached in Postgres forever — first call hits Gemini, repeat calls are free and fast.
+
+### Path Parameters
+
+| Name   | Type   | Required | Description |
+|--------|--------|----------|-------------|
+| domain | string | Yes      | Domain to value, e.g. "crypto.com". |
+
+### Query Parameters (all optional)
+
+| Name              | Type    | Description |
+|-------------------|---------|-------------|
+| registered        | boolean | If known, skip the live registration lookup. |
+| isPremium         | boolean | Flag the domain as registrar-premium. |
+| registrationPrice | number  | Current registration price in USD (anchors the valuation). |
+
+### Response: DomainValuation
+
+| Field          | Type      | Description |
+|----------------|-----------|-------------|
+| domain         | string    | Normalized domain queried |
+| score          | number    | 0–100 |
+| tier           | string    | "common" / "decent" / "premium" / "ultra" |
+| estimatedValue | string    | Human-readable USD range, e.g. "$500 - $2,000" |
+| reasoning      | string    | 2–3 sentence explanation |
+| factors        | array     | 3–6 entries of { label, impact, detail } |
+| cached         | boolean   | true if served from DB cache |
+
+### Rate Limit
+
+20 requests per hour per IP (Gemini calls cost money).
+
+### Example
+
+```bash
+curl "https://donadomains.xyz/api/valuate/crypto.com"
+```
+
+---
+
+## MCP Server for AI Clients
+
+`donadomains-mcp` is a Model Context Protocol server distributed on npm. Lets any MCP-aware AI client (Claude Desktop, Cursor, Continue, Windsurf, Zed) call the Donadomains pipeline directly.
+
+### Tools Exposed
+
+- `check_domain_availability(domain)` — availability + price OR ownership
+- `search_domains(keyword, limit?, tldFilter?, includeTaken?)` — multi-registrar search
+- `get_domain_info(domain)` — WHOIS / RDAP / DNS intel
+- `valuate_domain(domain, registered?, isPremium?, registrationPrice?)` — AI valuation
+
+### Install
+
+Add this to any MCP client config (example: Claude Desktop `claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "donadomains": {
+      "command": "npx",
+      "args": ["-y", "donadomains-mcp"]
+    }
+  }
+}
+```
+
+Source: https://github.com/adipundir/donadomains/tree/main/mcp
 
 ---
 

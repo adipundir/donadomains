@@ -130,6 +130,10 @@ const NAV_ITEMS = [
   { id: "free-api", label: "API", heading: true },
   { id: "domain-search", label: "Search" },
   { id: "domain-info", label: "Info" },
+  { id: "domain-valuate", label: "Valuate" },
+  { id: "mcp", label: "MCP (AI Agents)", heading: true },
+  { id: "mcp-install", label: "Install" },
+  { id: "mcp-tools", label: "Tools" },
   { id: "rate-limits", label: "Rate Limits" },
 ];
 
@@ -181,7 +185,7 @@ export default function DocsPage() {
           <div id="free-api" className="scroll-mt-24" />
           <div className="rounded-lg p-5 space-y-4" style={{ background: "var(--surface)", border: "2px solid var(--border-light)" }}>
             <div>
-              <p className="font-comic-title text-lg uppercase tracking-wide">2 Endpoints</p>
+              <p className="font-comic-title text-lg uppercase tracking-wide">3 Endpoints + MCP Server</p>
             </div>
             <div className="p-3 rounded-lg" style={{ background: "var(--surface-muted)" }}>
               <p className="font-comic-title text-[10px] uppercase tracking-widest opacity-50 mb-1">Base URL</p>
@@ -208,6 +212,28 @@ export default function DocsPage() {
                 <div>
                   <code className="text-sm font-bold">/api/domain/&#123;domain&#125;</code>
                   <p className="font-comic-body text-sm opacity-70 mt-0.5">Look up detailed info for a single domain — registrar, dates, owner, nameservers, status.</p>
+                </div>
+              </a>
+              <a
+                href="#domain-valuate"
+                className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:opacity-80"
+                style={{ background: "var(--surface-muted)" }}
+              >
+                <Badge color="green">GET</Badge>
+                <div>
+                  <code className="text-sm font-bold">/api/valuate/&#123;domain&#125;</code>
+                  <p className="font-comic-body text-sm opacity-70 mt-0.5">AI-powered valuation — score, tier, USD range, reasoning, factors.</p>
+                </div>
+              </a>
+              <a
+                href="#mcp"
+                className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:opacity-80"
+                style={{ background: "var(--surface-muted)" }}
+              >
+                <Badge>MCP</Badge>
+                <div>
+                  <code className="text-sm font-bold">npx -y donadomains-mcp</code>
+                  <p className="font-comic-body text-sm opacity-70 mt-0.5">MCP server for Claude Desktop, Cursor, Continue, Windsurf, Zed — drop-in AI agent access.</p>
                 </div>
               </a>
             </div>
@@ -495,6 +521,75 @@ print(intel["sources"])      # ["rdap", "dns"]` },
             </ol>
           </Section>
 
+          {/* ── Endpoint 3: Valuate ── */}
+          <Section id="domain-valuate" title="Domain Valuation">
+            <div
+              className="rounded-lg p-4 comic-border-subtle"
+              style={{ background: "var(--surface)" }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <MethodBadge method="GET" />
+                <code className="text-base font-bold">/api/valuate/&#123;domain&#125;</code>
+              </div>
+              <p className="opacity-70 text-sm">
+                AI-powered domain valuation using Google Gemini. Returns score (0-100), tier (common/decent/premium/ultra), USD range, reasoning, and per-factor breakdown. Cached in Postgres forever — repeat lookups are free.
+              </p>
+            </div>
+
+            <h3 className="font-comic-title text-xl mt-6 mb-2">Query Parameters</h3>
+            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
+              <FieldRow name="registered" type="boolean" desc="Optional. Skip the registration lookup if you already know." optional />
+              <FieldRow name="isPremium" type="boolean" desc="Optional. Flag this as a registrar-premium domain." optional />
+              <FieldRow name="registrationPrice" type="number" desc="Optional. Current registration price in USD." optional />
+            </div>
+
+            <h3 className="font-comic-title text-xl mt-6 mb-2">Example</h3>
+            <CodeBlock title="curl">{`curl "https://donadomains.xyz/api/valuate/crypto.com"`}</CodeBlock>
+          </Section>
+
+          {/* ── MCP for AI Agents ── */}
+          <Section id="mcp" title="MCP Server (for AI Agents)">
+            <div
+              className="rounded-lg p-4 comic-border-subtle"
+              style={{ background: "var(--surface)" }}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Badge>MCP</Badge>
+                <Badge color="green">stdio</Badge>
+              </div>
+              <p className="opacity-80 mb-2">
+                <strong>donadomains-mcp</strong> is a Model Context Protocol server distributed via npm. Drop it into Claude Desktop, Cursor, Continue, Windsurf, or Zed and your AI gains real-time domain superpowers.
+              </p>
+              <p className="opacity-70 text-sm">
+                Ask Claude: <em>"is ad402.sh available?"</em> · <em>"find a cheap .io domain for craftbeer"</em> · <em>"who owns github.com and when does it expire?"</em> · <em>"what's crypto.com worth?"</em>
+              </p>
+            </div>
+          </Section>
+
+          <Section id="mcp-install" title="MCP Install">
+            <p className="opacity-80 mb-3">Add this single block to your MCP client config. No env vars, no API keys.</p>
+            <CodeBlock title="claude_desktop_config.json / cursor / windsurf">{`{
+  "mcpServers": {
+    "donadomains": {
+      "command": "npx",
+      "args": ["-y", "donadomains-mcp"]
+    }
+  }
+}`}</CodeBlock>
+            <p className="opacity-60 text-sm mt-3">
+              Per-client config locations and Zed/Continue variants are in the <a className="underline" style={{ color: "var(--accent)" }} href="https://github.com/adipundir/donadomains/tree/main/mcp">mcp/README</a>.
+            </p>
+          </Section>
+
+          <Section id="mcp-tools" title="MCP Tools">
+            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
+              <FieldRow name="check_domain_availability" type="domain" desc="Returns availability + best price OR ownership info. Works for all TLDs incl. RDAP-less ccTLDs via WHOIS port-43." />
+              <FieldRow name="search_domains" type="keyword, limit?, tldFilter?, includeTaken?" desc="Search across 6 registrars, return available domains with prices." />
+              <FieldRow name="get_domain_info" type="domain" desc="Deep WHOIS/RDAP/DNS intel — registrar, dates, nameservers, status, DNSSEC." />
+              <FieldRow name="valuate_domain" type="domain, registered?, isPremium?, registrationPrice?" desc="AI-powered valuation. Score, tier, USD range, reasoning, factors." />
+            </div>
+          </Section>
+
           {/* Rate Limits */}
           <Section id="rate-limits" title="Rate Limits">
             <div
@@ -506,7 +601,8 @@ print(intel["sources"])      # ["rdap", "dns"]` },
               </p>
               <div className="rounded-lg overflow-hidden mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
                 <FieldRow name="/api/search" type="20 req/hr" desc="Each search scrapes 6 registrars — expensive upstream" />
-                <FieldRow name="/api/domain/{domain}" type="60 req/hr" desc="Lightweight RDAP + WHOIS + DNS lookups" />
+                <FieldRow name="/api/domain/{domain}" type="60 req/hr" desc="Lightweight RDAP + WHOIS + DNS lookups (read-through cached)" />
+                <FieldRow name="/api/valuate/{domain}" type="20 req/hr" desc="Gemini calls cost money — first call uncached, repeat calls free" />
               </div>
               <ul className="list-disc list-inside space-y-1.5 opacity-80">
                 <li>Rate limits reset every hour from your first request</li>

@@ -27,7 +27,27 @@ curl "https://donadomains.xyz/api/search?q=myproject"
 
 # Get deep intelligence on a single domain
 curl "https://donadomains.xyz/api/domain/github.com"
+
+# AI-powered valuation
+curl "https://donadomains.xyz/api/valuate/crypto.com"
 ```
+
+### MCP Server (for AI agents)
+
+Use Donadomains directly from Claude Desktop, Cursor, Continue, Windsurf, Zed, or any MCP-aware client. Add this to your config:
+
+```json
+{
+  "mcpServers": {
+    "donadomains": {
+      "command": "npx",
+      "args": ["-y", "donadomains-mcp"]
+    }
+  }
+}
+```
+
+Then ask your AI: *"is ad402.sh available?"*, *"find me cheap .io domains for craftbeer"*, *"who owns github.com and when does it expire?"*. See [`mcp/README.md`](./mcp/README.md) for per-client setup.
 
 ### AI Agent Discovery
 
@@ -46,6 +66,7 @@ Full interactive docs at [donadomains.xyz/docs](https://donadomains.xyz/docs).
 - **Neon Postgres** + **Drizzle ORM** for watch system storage and the domain intel cache
 - **Inngest** for background job scheduling (domain watch checks)
 - **Brevo** for email notifications
+- **MCP** (`@modelcontextprotocol/sdk`) — stdio MCP server in [`mcp/`](./mcp), distributed as `donadomains-mcp` on npm
 
 ## License
 

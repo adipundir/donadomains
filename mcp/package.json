@@ -1,0 +1,53 @@
+{
+  "name": "donadomains-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Donadomains — real-time domain availability, prices across 6 registrars, RDAP/WHOIS intel, and AI valuation.",
+  "type": "module",
+  "bin": {
+    "donadomains-mcp": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "domain",
+    "whois",
+    "rdap",
+    "domain-search",
+    "ai",
+    "claude",
+    "cursor",
+    "donadomains"
+  ],
+  "author": "Donadomains",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adipundir/donadomains",
+    "directory": "mcp"
+  },
+  "homepage": "https://donadomains.xyz",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
