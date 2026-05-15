@@ -21,6 +21,8 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { checkApiRateLimit, getClientIp } from "@/app/lib/api-rate-limit";
+import { getDb } from "@/app/lib/db";
+import { mcpToolCalls } from "@/app/lib/schema";
 import { ALL_DEFINITIONS, TOOLS_BY_NAME } from "@/app/lib/mcp-tools";
 
 export const dynamic = "force-dynamic";
@@ -171,11 +173,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         });
       }
 
+      const t0 = Date.now();
       try {
         const result = await tool.handler(args, { ip });
+        logToolCall(name, args, Date.now() - t0, result.isError === true);
         return ok(id, result);
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
+        logToolCall(name, args, Date.now() - t0, true);
         console.error(`[/api/mcp] tool=${name} threw:`, message);
         return ok(id, {
           isError: true,
@@ -186,5 +191,39 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     default:
       return err(id, { code: ERROR.METHOD_NOT_FOUND, message: `Method not found: ${body.method}` });
+  }
+}
+
+// ─── Logging ────────────────────────────────────────────────────────────────
+
+/**
+ * Fire-and-forget insert into mcp_tool_calls. Captures the primary
+ * user-supplied argument (domain or keyword) so the admin daily view can
+ * show what users are searching. Never throws — log writes that fail are
+ * silently dropped to avoid polluting the response path.
+ */
+function logToolCall(
+  tool: string,
+  args: Record<string, unknown>,
+  durationMs: number,
+  isError: boolean,
+): void {
+  const primary =
+    (typeof args.domain === "string" && args.domain) ||
+    (typeof args.keyword === "string" && args.keyword) ||
+    "";
+  const query = String(primary).toLowerCase().slice(0, 253);
+  if (!query) return;
+  try {
+    const db = getDb();
+    void db
+      .insert(mcpToolCalls)
+      .values({ tool, query, durationMs, isError })
+      .execute()
+      .catch(() => {
+        /* swallow — logging must not fail the response */
+      });
+  } catch {
+    /* DB not configured / not reachable — also swallow */
   }
 }

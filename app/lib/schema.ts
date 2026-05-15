@@ -98,6 +98,32 @@ export const searchLogs = pgTable(
   ],
 );
 
+// ─── MCP Tool Calls ──────────────────────────────────────────────────────────
+
+/**
+ * Every tool invocation against /api/mcp. Captures the tool name and the
+ * primary user-supplied argument (domain or keyword) so we can see what
+ * the AI clients are actually asking for. No IP stored — matches the
+ * existing searchLogs privacy posture; rate-limiting is the only thing
+ * that touches IP and it gets a separate short-TTL row.
+ */
+export const mcpToolCalls = pgTable(
+  "mcp_tool_calls",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tool: text("tool").notNull(),
+    query: text("query").notNull(),
+    durationMs: integer("duration_ms").notNull(),
+    isError: boolean("is_error").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("mcp_tool_calls_created_at_idx").on(table.createdAt),
+    index("mcp_tool_calls_tool_idx").on(table.tool),
+    index("mcp_tool_calls_query_idx").on(table.query),
+  ],
+);
+
 // ─── Domain Valuations (cache) ──────────────────────────────────────────────
 
 export const domainValuations = pgTable(

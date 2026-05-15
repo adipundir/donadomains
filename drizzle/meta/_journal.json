@@ -43,6 +43,13 @@
       "when": 1778169600000,
       "tag": "0005_whois_intel_cache",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778400000000,
+      "tag": "0006_mcp_tool_calls",
+      "breakpoints": true
     }
   ]
 }
