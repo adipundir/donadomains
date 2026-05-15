@@ -1,43 +1,14 @@
-# Donadomains
+# Donadomains MCP
 
-**Deep domain intelligence — cheapest prices, full RDAP/DNS intel, and expiry alerts, all in one search.**
+**Real-time domain superpowers for your AI agent — availability, prices across 6 registrars, full WHOIS/RDAP intel, and AI valuation. Free, no signup, no API key.**
 
-Donadomains aggregates real-time domain pricing from 8+ registrars, provides deep intelligence on taken domains — registrar, dates, nameservers, status codes — and watches them for you.
+Live at [donadomains.xyz](https://donadomains.xyz) · [MCP Docs](https://donadomains.xyz/docs) · Product of [Donalabs](https://donalabs.com)
 
-Live at [donadomains.xyz](https://donadomains.xyz) | [API Docs](https://donadomains.xyz/docs) | Product of [Donalabs](https://donalabs.com)
+## Install (pick whichever your client supports)
 
-## What it does
-
-### Search & Compare Prices
-Enter a keyword like `donataxes` or a full domain like `myproject.io`. Donadomains scrapes 8+ registrar search pages in parallel — GoDaddy, Namecheap, Porkbun, Spaceship, Squarespace, Dynadot, Name.com, and more — and shows you live pricing from each one, with the cheapest highlighted. Results stream in progressively as each registrar responds.
-
-### Deep Domain Intelligence
-For any taken domain, Donadomains pulls together data from multiple sources — RDAP registries, port-43 WHOIS (covers RDAP-less ccTLDs like `.sh`, `.io`, `.ac`), DNS records, and web scraping as a last-resort fallback — to give you the full picture: registrar, registration and expiry dates, nameservers, DNSSEC status, status codes, and any public registrant or contact information. Postgres-backed read-through cache with adaptive TTLs keeps repeat lookups sub-100ms.
-
-### Domain Watch
-Want a domain that's already taken? Watch it. Donadomains monitors it on smart intervals based on how close it is to expiry — every 2 hours for domains in pending delete, every 4 hours near expiry, daily or weekly otherwise — and emails you the moment it becomes available again.
-
-## API
-
-No authentication required.
-
-```bash
-# Search domains and compare prices across registrars
-curl "https://donadomains.xyz/api/search?q=myproject"
-
-# Get deep intelligence on a single domain
-curl "https://donadomains.xyz/api/domain/github.com"
-
-# AI-powered valuation
-curl "https://donadomains.xyz/api/valuate/crypto.com"
-```
-
-### MCP Server (for AI agents)
-
-Use Donadomains directly from Claude Desktop, Cursor, Continue, Windsurf, Zed, Claude.ai web Connectors, or any MCP-aware client. Two transports — pick whichever your client supports:
+**Option A — URL** (recommended; works in Claude Desktop ≥ 0.7, Claude.ai web Connectors, Cursor ≥ 0.41, Windsurf, Continue, Zed):
 
 ```json
-// Recommended — hosted, zero-install
 {
   "mcpServers": {
     "donadomains": {
@@ -47,8 +18,9 @@ Use Donadomains directly from Claude Desktop, Cursor, Continue, Windsurf, Zed, C
 }
 ```
 
+**Option B — npx** (stdio fallback; requires Node.js ≥ 18):
+
 ```json
-// Fallback — stdio via npx (for clients without HTTP transport)
 {
   "mcpServers": {
     "donadomains": {
@@ -59,27 +31,64 @@ Use Donadomains directly from Claude Desktop, Cursor, Continue, Windsurf, Zed, C
 }
 ```
 
-Then ask your AI: *"is ad402.sh available?"*, *"find me cheap .io domains for craftbeer"*, *"who owns github.com and when does it expire?"*. See [`mcp/README.md`](./mcp/README.md) for per-client setup.
+Per-client config locations (Claude Desktop, Cursor, Continue, Windsurf, Zed) are in [`mcp/README.md`](./mcp/README.md).
 
-### AI Agent Discovery
+## What your AI can do
 
-- OpenAPI spec: [donadomains.xyz/openapi.json](https://donadomains.xyz/openapi.json)
-- LLM reference: [donadomains.xyz/llms.txt](https://donadomains.xyz/llms.txt)
-- Full reference: [donadomains.xyz/llms-full.txt](https://donadomains.xyz/llms-full.txt)
-- AI plugin manifest: [donadomains.xyz/.well-known/ai-plugin.json](https://donadomains.xyz/.well-known/ai-plugin.json)
+- `check_domain_availability` — is `donataxes.com` free? Who owns it if not?
+- `search_domains` — find available domains across 6 registrars with live pricing
+- `get_domain_info` — WHOIS / RDAP / DNS intel for any TLD (yes, including `.sh`, `.io`, `.ac`)
+- `valuate_domain` — AI-powered USD valuation with reasoning + per-factor breakdown
 
-Full interactive docs at [donadomains.xyz/docs](https://donadomains.xyz/docs).
+Then just ask: *"is ad402.sh available?"*, *"find me a cheap .io domain for craftbeer"*, *"who owns github.com?"*, *"what's crypto.com worth?"*
 
-## Tech Stack
+## Rate limits (free, per-IP, IPv6 normalized to /64)
 
-- **Next.js 16** (App Router), React, TypeScript, Tailwind CSS
+| Bucket | Limit |
+|---|---|
+| Overall MCP frames | 200 / hour |
+| `check_domain_availability` / `get_domain_info` | 60 / hour (cached, light) |
+| `search_domains` | 20 / hour (scrapes 6 registrars) |
+| `valuate_domain` | 20 / hour (Gemini on cache miss) |
+
+Repeat lookups of the same domain hit the Postgres cache (~sub-100ms) and don't burn additional quota. Need higher limits? [Open an issue](https://github.com/adipundir/donadomains/issues) — we'll plan a self-service tier when there's demand.
+
+## How it works under the hood
+
+For any taken domain, Donadomains layers four data sources to give you the full picture — registrar, registration and expiry dates, nameservers, DNSSEC status, status codes, and any public registrant or contact information:
+
+1. **RDAP** (via IANA bootstrap, cached) for the ~500 TLDs that publish one
+2. **Port-43 WHOIS** (via `node:net`) for RDAP-less ccTLDs like `.sh`, `.io`, `.ac`, `.ws`
+3. **DNS-over-HTTPS** (Cloudflare) for nameservers and resolution confirmation
+4. **who.is scrape** (Firecrawl) as last-resort fallback
+
+Postgres-backed read-through cache with adaptive TTLs keeps repeat lookups sub-100ms.
+
+## Tech stack
+
+- **Next.js 16** (App Router), React, TypeScript, Tailwind CSS — hosted on Vercel
+- **Model Context Protocol** (`@modelcontextprotocol/sdk`) — Streamable HTTP at `/api/mcp` + stdio via `donadomains-mcp` on npm
 - **Firecrawl** for JS-heavy registrar page scraping
-- **RDAP** (via IANA bootstrap) + **port-43 WHOIS** (via `node:net`) + **DNS-over-HTTPS** (Cloudflare) for layered domain intelligence
-- **Neon Postgres** + **Drizzle ORM** for watch system storage and the domain intel cache
-- **Inngest** for background job scheduling (domain watch checks)
+- **RDAP** + **port-43 WHOIS** + **DNS-over-HTTPS** for layered intelligence
+- **Neon Postgres** + **Drizzle ORM** for the intel cache, rate limits, and watch system
+- **Inngest** for background job scheduling
 - **Brevo** for email notifications
-- **MCP** (`@modelcontextprotocol/sdk`) — stdio MCP server in [`mcp/`](./mcp), distributed as `donadomains-mcp` on npm
+- **Gemini 2.0 Flash** for domain valuation
+
+## Repo layout
+
+```
+.
+├── app/                ← Next.js app (web search UI + MCP HTTP route + REST handlers)
+│   ├── api/mcp/        ← Streamable HTTP MCP endpoint
+│   ├── lib/whois/      ← Port-43 WHOIS client + IANA discovery + parser
+│   ├── lib/mcp-tools/  ← In-app MCP tool handlers
+│   └── lib/intel-cache.ts
+├── mcp/                ← donadomains-mcp npm package (stdio fallback)
+├── drizzle/            ← Migrations
+└── Makefile            ← install / build / test / publish / clean
+```
 
 ## License
 
-Private / All rights reserved.
+MIT

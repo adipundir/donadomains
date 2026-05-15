@@ -1,298 +1,20 @@
-# Donadomains — Full API Reference
+# Donadomains MCP — Full Reference
 
-> Domain search aggregator that compares prices across 6 registrars in real-time. Find the cheapest place to buy any domain, or look up who owns it.
+> Free Model Context Protocol server. Gives any MCP-aware AI client (Claude Desktop, Claude.ai web Connectors, Cursor, Continue, Windsurf, Zed) real-time domain superpowers: availability, prices across 6 registrars, full WHOIS/RDAP intel, and AI valuation.
 
-Base URL: https://donadomains.xyz
-Docs: https://donadomains.xyz/docs
-Auth: None — open API rate-limited per IP (IPv6 normalized to /64).
-MCP: For AI clients (Claude Desktop, Claude.ai web, Cursor, Continue, Windsurf, Zed) connect by URL to https://donadomains.xyz/api/mcp, or fall back to `npx -y donadomains-mcp` for stdio-only clients.
+Connect URL: https://donadomains.xyz/api/mcp
+Web docs: https://donadomains.xyz/docs
+Source: https://github.com/adipundir/donadomains
 
----
-
-## Endpoint 1: Domain Search
-
-GET /api/search?q={keyword}
-
-Searches domain availability across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun) in real-time. Returns live pricing with direct purchase links from each registrar, and automatically marks the cheapest option.
-
-### Parameters
-
-| Name   | Type   | Required | Description |
-|--------|--------|----------|-------------|
-| q      | string | Yes      | Search keyword (e.g. "startup") or full domain (e.g. "startup.io"). A bare keyword searches across all TLDs that registrars support. |
-| stream | string | No       | Set to "true" for Server-Sent Events streaming. Omit for a single JSON response. |
-
-### JSON Response (default)
-
-Waits for all registrars to respond (typically 5-15 seconds), then returns a single JSON object.
-
-```
-GET /api/search?q=example
-```
-
-Response shape:
-```json
-{
-  "keyword": "example",
-  "tld": null,
-  "results": [ DomainResult, ... ],
-  "sources": [ SourceStatus, ... ]
-}
-```
-
-If the query includes a TLD (e.g. "example.io"), the `tld` field will be ".io" and that exact domain will be prioritized in results.
-
-### Streaming Response (stream=true)
-
-Results arrive progressively via Server-Sent Events as each registrar completes. This is the recommended mode — users see results within 2-5 seconds as fast registrars return first.
-
-```
-GET /api/search?q=example&stream=true
-```
-
-Each SSE message has a `data:` prefix containing JSON. Event types:
-
-- `init` — Sent first. Contains `registrars` array listing names of registrars being queried.
-- `batch` — Sent each time a registrar completes. Contains `registrar` (name), `registrarStatus` ("ok" or "failed"), `results` (full merged results so far), `sourceStatuses` (all sources so far).
-- `complete` — Final event. Stream closes after this.
-
-### DomainResult
-
-| Field        | Type          | Description |
-|--------------|---------------|-------------|
-| domain       | string        | Fully qualified domain name (e.g. "example.com") |
-| available    | boolean       | Whether the domain is available for registration |
-| tld          | string        | TLD including dot (e.g. ".com") |
-| matchType    | string?       | "exact" if the domain matches the keyword + a standard TLD, "similar" otherwise |
-| buyLinks     | BuyLink[]     | Purchase links from registrars with pricing (empty array for taken domains) |
-| registerUrl  | string?       | Direct URL to register at the cheapest registrar |
-
-### BuyLink
-
-| Field           | Type    | Description |
-|-----------------|---------|-------------|
-| name            | string  | Registrar name (e.g. "GoDaddy", "Namecheap") |
-| url             | string  | Direct purchase URL — takes user to checkout |
-| price           | string? | Formatted price (e.g. "$9.99/yr") |
-| priceNum        | number? | Numeric price for sorting/comparison |
-| isCheapest      | boolean?| True if this is the cheapest option across all registrars |
-| premium         | boolean?| True if this is a premium/aftermarket listing |
-| source          | string  | Always "scraped" |
-
-### SourceStatus
-
-| Field      | Type    | Description |
-|------------|---------|-------------|
-| name       | string  | Registrar name |
-| status     | string  | "ok" or "failed" |
-| count      | number  | Number of domains returned by this source |
-| durationMs | number  | Time in milliseconds the registrar scrape took |
-| error      | string? | Error message when status is "failed" (e.g. "timeout") |
-
-### Error Responses
-
-| Status | Description |
-|--------|-------------|
-| 400    | Missing or invalid `q` parameter |
-| 500    | Internal server error |
-
-### Example: JavaScript
-
-```javascript
-const res = await fetch("https://donadomains.xyz/api/search?q=myproject");
-const data = await res.json();
-
-const available = data.results.filter(r => r.available);
-const cheapest = available
-  .flatMap(r => r.buyLinks ?? [])
-  .find(l => l.isCheapest);
-
-console.log(`${available.length} domains available`);
-console.log(`Cheapest: ${cheapest?.name} at ${cheapest?.price}`);
-console.log(`Buy: ${cheapest?.url}`);
-```
-
-### Example: Python
-
-```python
-import requests
-
-res = requests.get("https://donadomains.xyz/api/search", params={"q": "myproject"})
-data = res.json()
-
-available = [r for r in data["results"] if r["available"]]
-for domain in available:
-    for link in domain.get("buyLinks", []):
-        if link.get("isCheapest"):
-            print(f"{domain['domain']} — {link['price']} at {link['name']}")
-            print(f"Buy: {link['url']}")
-```
-
-### Example: Streaming with JavaScript
-
-```javascript
-const response = await fetch("https://donadomains.xyz/api/search?q=myproject&stream=true");
-const reader = response.body.getReader();
-const decoder = new TextDecoder();
-let buffer = "";
-
-while (true) {
-  const { done, value } = await reader.read();
-  if (done) break;
-
-  buffer += decoder.decode(value, { stream: true });
-  const parts = buffer.split("\n\n");
-  buffer = parts.pop();
-
-  for (const part of parts) {
-    const line = part.split("\n").find(l => l.startsWith("data: "));
-    if (!line) continue;
-    const event = JSON.parse(line.slice(6));
-
-    if (event.type === "batch") {
-      console.log(`${event.registrar}: ${event.registrarStatus}`);
-      console.log(`${event.results.length} results so far`);
-    } else if (event.type === "complete") {
-      console.log("Search complete");
-    }
-  }
-}
-```
+Auth: None. No signup, no API key. Rate-limited per IP (see below).
 
 ---
 
-## Endpoint 2: Domain Info
+## Install
 
-GET /api/domain/{domain}
+### Option A — URL (recommended)
 
-Returns comprehensive domain intelligence for a single domain. Layered pipeline runs RDAP (or port-43 WHOIS for RDAP-less TLDs like .sh, .io, .ac) plus DNS-over-HTTPS in parallel, then tops up with port-43 WHOIS for sparse RDAP data and falls back to who.is scraping as last resort. Responses are cached in Postgres with adaptive TTLs (24h registered, 1h unregistered/near-expiry, 5min errors). The response carries `X-Cache: HIT|MISS` and `X-Cache-Age` headers.
-
-### Path Parameters
-
-| Name   | Type   | Required | Description |
-|--------|--------|----------|-------------|
-| domain | string | Yes      | Fully qualified domain name (e.g. "example.com"). Must be lowercase alphanumeric with dots/hyphens, ending in a valid TLD. |
-
-### Response: DomainIntel
-
-| Field          | Type     | Description |
-|----------------|----------|-------------|
-| domain         | string   | The normalized domain queried |
-| registered     | boolean  | Whether the domain is currently registered |
-| status         | string[]?| ICANN domain status codes |
-| created        | string?  | Creation date (ISO 8601) |
-| updated        | string?  | Last updated date (ISO 8601) |
-| expires        | string?  | Expiration date (ISO 8601) |
-| registrar      | string?  | Name of the registrar |
-| registrarUrl   | string?  | Registrar website URL |
-| registrant     | string?  | Name of the registrant (often redacted for privacy) |
-| organization   | string?  | Registrant organization |
-| contactEmail   | string?  | Registrant contact email (only shown when not privacy-protected) |
-| contactPhone   | string?  | Registrant contact phone |
-| contactAddress | string?  | Registrant address |
-| nameservers    | string[]?| Authoritative nameservers |
-| dnssec         | string?  | DNSSEC status (e.g. "signedDelegation") |
-| sources        | string[] | Data sources used: any of "rdap", "whois43", "dns", "who.is" |
-| timing         | object   | Milliseconds spent per source (e.g. { "rdap": 342, "dns": 87, "whois43": 412 }) |
-| fetchedAt      | string?  | ISO timestamp of the last fresh fetch (cache-aware) |
-
-### Error Responses
-
-| Status | Description |
-|--------|-------------|
-| 400    | Invalid domain format |
-| 504    | Request timed out (10 second limit) |
-| 500    | Internal server error |
-
-### Example: JavaScript
-
-```javascript
-const res = await fetch("https://donadomains.xyz/api/domain/github.com");
-const intel = await res.json();
-
-console.log(intel.registered);   // true
-console.log(intel.registrar);    // "MarkMonitor Inc."
-console.log(intel.expires);      // "2025-10-09T18:20:50Z"
-console.log(intel.nameservers);  // ["dns1.p08.nsone.net", ...]
-```
-
-### Example: Python
-
-```python
-import requests
-
-res = requests.get("https://donadomains.xyz/api/domain/github.com")
-intel = res.json()
-
-if intel["registered"]:
-    print(f"Registrar: {intel.get('registrar')}")
-    print(f"Expires: {intel.get('expires')}")
-    print(f"Nameservers: {intel.get('nameservers')}")
-else:
-    print("Domain is available for registration")
-```
-
----
-
-## Endpoint 3: Domain Valuation
-
-GET /api/valuate/{domain}
-
-AI-powered domain valuation using Google Gemini. Returns a numeric score, a tier, an estimated USD price range, reasoning, and per-factor analysis (TLD value, length, brandability, keyword strength, age, character composition, etc.). Results are cached in Postgres forever — first call hits Gemini, repeat calls are free and fast.
-
-### Path Parameters
-
-| Name   | Type   | Required | Description |
-|--------|--------|----------|-------------|
-| domain | string | Yes      | Domain to value, e.g. "crypto.com". |
-
-### Query Parameters (all optional)
-
-| Name              | Type    | Description |
-|-------------------|---------|-------------|
-| registered        | boolean | If known, skip the live registration lookup. |
-| isPremium         | boolean | Flag the domain as registrar-premium. |
-| registrationPrice | number  | Current registration price in USD (anchors the valuation). |
-
-### Response: DomainValuation
-
-| Field          | Type      | Description |
-|----------------|-----------|-------------|
-| domain         | string    | Normalized domain queried |
-| score          | number    | 0–100 |
-| tier           | string    | "common" / "decent" / "premium" / "ultra" |
-| estimatedValue | string    | Human-readable USD range, e.g. "$500 - $2,000" |
-| reasoning      | string    | 2–3 sentence explanation |
-| factors        | array     | 3–6 entries of { label, impact, detail } |
-| cached         | boolean   | true if served from DB cache |
-
-### Rate Limit
-
-20 requests per hour per IP (Gemini calls cost money).
-
-### Example
-
-```bash
-curl "https://donadomains.xyz/api/valuate/crypto.com"
-```
-
----
-
-## MCP Server for AI Clients
-
-Donadomains ships an MCP server in two transports:
-
-- **URL (recommended)**: `https://donadomains.xyz/api/mcp` — Streamable HTTP, zero install, instant updates
-- **npx**: `npx -y donadomains-mcp` — stdio, for older clients without HTTP support
-
-### Tools Exposed
-
-- `check_domain_availability(domain)` — availability + price OR ownership
-- `search_domains(keyword, limit?, tldFilter?, includeTaken?)` — multi-registrar search
-- `get_domain_info(domain)` — WHOIS / RDAP / DNS intel
-- `valuate_domain(domain, registered?, isPremium?, registrationPrice?)` — AI valuation
-
-### Install (URL)
+For clients that support the Streamable HTTP transport. One block to add to your MCP client config:
 
 ```json
 {
@@ -304,7 +26,11 @@ Donadomains ships an MCP server in two transports:
 }
 ```
 
-### Install (npx)
+Claude.ai web users: Settings → Connectors → Add custom → paste `https://donadomains.xyz/api/mcp`.
+
+### Option B — npx (stdio)
+
+For clients that only support stdio transport. Requires Node.js ≥ 18.
 
 ```json
 {
@@ -317,84 +43,178 @@ Donadomains ships an MCP server in two transports:
 }
 ```
 
-Source: https://github.com/adipundir/donadomains/tree/main/mcp
+Per-client config-file locations (Claude Desktop, Cursor, Continue, Windsurf, Zed) are documented in https://github.com/adipundir/donadomains/tree/main/mcp.
 
 ---
 
-## Common Recipes
+## Tools
 
-### Find the cheapest available domain for a keyword
+### Tool 1: check_domain_availability
 
-```bash
-curl -s "https://donadomains.xyz/api/search?q=myproject" | \
-  jq '[.results[] | select(.available) | {domain, price: (.buyLinks[] | select(.isCheapest) | .price), registrar: (.buyLinks[] | select(.isCheapest) | .name), url: .registerUrl}] | sort_by(.price)'
-```
+Check if a specific domain is available for registration right now.
 
-### Check if a specific domain is available
+#### Input
 
-```javascript
-const res = await fetch("https://donadomains.xyz/api/search?q=myproject.com");
-const data = await res.json();
-const exact = data.results.find(r => r.domain === "myproject.com");
+| Param | Type | Required | Description |
+|---|---|---|---|
+| domain | string | Yes | Fully qualified domain. Example: "example.com" or "ad402.sh". |
 
-if (exact?.available) {
-  const cheapest = exact.buyLinks.find(l => l.isCheapest);
-  console.log(`Available! ${cheapest.price} at ${cheapest.name}`);
-  console.log(`Buy: ${cheapest.url}`);
-} else {
-  console.log("Taken");
-}
-```
+#### Returns
 
-### Find all available .com domains under $15/yr
+If available:
+- `domain` (string)
+- `available` (true)
+- `bestPrice` (string, e.g. "$9.99/yr")
+- `bestPriceNumeric` (number)
+- `bestRegistrar` (string)
+- `buyUrl` (string)
+- `allOffers` (array of {registrar, price, priceNum, url, isCheapest})
 
-```python
-import requests
+If taken:
+- `domain` (string)
+- `available` (false)
+- `owner` (object): registrar, registrant, organization, created, expires, updated, nameservers, status, dnssec, dataSources
 
-data = requests.get("https://donadomains.xyz/api/search", params={"q": "coolstartup"}).json()
+### Tool 2: search_domains
 
-for r in data["results"]:
-    if r["available"] and r["tld"] == ".com":
-        for link in r.get("buyLinks", []):
-            if link.get("priceNum", 999) < 15:
-                print(f"{r['domain']} — {link['price']} at {link['name']}")
-```
+Search a keyword across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun) in parallel. Returns available domains with prices, sorted by relevance, exact-match priority, registrar coverage, popular TLDs, and price.
 
-### Monitor a domain's expiry date
+#### Input
 
-```javascript
-const res = await fetch("https://donadomains.xyz/api/domain/expiring-domain.com");
-const intel = await res.json();
+| Param | Type | Required | Description |
+|---|---|---|---|
+| keyword | string | Yes | Bare word ("startup") or full domain ("startup.io"). Lowercase alphanumeric + hyphens. |
+| limit | number | No | Max results (default 20, max 50). |
+| tldFilter | string | No | Only return this TLD, e.g. ".com". Include the leading dot. |
+| includeTaken | boolean | No | Include taken domains (default false). |
 
-if (intel.expires) {
-  const days = Math.ceil((new Date(intel.expires) - Date.now()) / 86400000);
-  console.log(`Expires in ${days} days (${intel.expires})`);
-  console.log(`Registrar: ${intel.registrar}`);
-}
-```
+#### Returns
 
-### Compare prices across all registrars for one domain
+- `keyword` (string)
+- `totalFound` (number)
+- `returned` (number)
+- `results` (array): each `{domain, available, tld, matchType, bestPrice, bestPriceNumeric, bestRegistrar, buyUrl, allOffers}`
+- `registrarStatus` (array): per-registrar `{name, status, count, durationMs, error?}`
 
-```bash
-curl -s "https://donadomains.xyz/api/search?q=example.io" | \
-  jq '.results[] | select(.domain=="example.io") | .buyLinks[] | {registrar: .name, price: .price, cheapest: .isCheapest}'
-```
+### Tool 3: get_domain_info
+
+Deep WHOIS / RDAP / DNS intelligence for a registered domain. Layered pipeline:
+
+1. **RDAP** for the ~500 TLDs that publish one
+2. **Port-43 WHOIS** for RDAP-less ccTLDs (.sh, .io, .ac, .ws, .nu, .to)
+3. **DNS-over-HTTPS** for nameservers and resolution confirmation
+4. **who.is scrape** as last-resort fallback
+
+Postgres-cached with adaptive TTLs (24h registered, 1h unregistered, 5min errors). Repeat lookups sub-100ms.
+
+#### Input
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| domain | string | Yes | Fully qualified domain. Example: "github.com". |
+
+#### Returns
+
+DomainIntel object with all of:
+
+- `domain` (string)
+- `registered` (boolean)
+- `status` (string[]) — ICANN status codes (e.g. "clientTransferProhibited")
+- `created`, `updated`, `expires` (ISO 8601 strings)
+- `registrar`, `registrarUrl` (string)
+- `registrant`, `organization` (string, often "REDACTED FOR PRIVACY")
+- `contactEmail`, `contactPhone`, `contactAddress` (string, if not privacy-protected)
+- `nameservers` (string[])
+- `dnssec` (string)
+- `sources` (string[]): any of "rdap", "whois43", "dns", "who.is"
+- `timing` (object): ms per source
+- `fetchedAt` (ISO string): last fresh fetch
+
+### Tool 4: valuate_domain
+
+AI-powered domain valuation using Google Gemini 2.0 Flash. Live registration intel is pulled into the model context. Results are cached in Postgres forever — first call hits Gemini, repeat calls are free and instant.
+
+#### Input
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| domain | string | Yes | Domain to value. Example: "crypto.com". |
+| registered | boolean | No | Skip the registration lookup if you already know. |
+| isPremium | boolean | No | Flag as registrar-premium (anchors valuation up). |
+| registrationPrice | number | No | Current registration price in USD, if known. |
+
+#### Returns
+
+- `domain` (string)
+- `score` (number, 0-100)
+- `tier` ("common" | "decent" | "premium" | "ultra")
+- `estimatedValue` (string, e.g. "$500 - $2,000")
+- `reasoning` (string, 2-3 sentences)
+- `factors` (array of {label, impact, detail}) — 3-6 entries
+- `cached` (boolean) — true if served from cache
 
 ---
 
-## How It Works
+## Rate Limits
 
-1. **Registrar Scraping**: All 6 registrar search pages are scraped in parallel via Firecrawl. Each registrar returns domains across the TLDs they support — no hardcoded list.
+Free, unauthenticated, per source IP. IPv6 addresses are normalized to their /64 prefix before keying the rate limit (so attackers can't rotate the lower 64 bits to bypass).
 
-2. **Price Aggregation**: For available domains, pricing from all registrars is merged and the cheapest option is marked with `isCheapest: true`.
+| Bucket | Limit | Notes |
+|---|---|---|
+| Overall MCP frames | 200 / hour | Every JSON-RPC frame counts. Catch-all. |
+| check_domain_availability | 60 / hour | Cached, light. Shares bucket with get_domain_info. |
+| get_domain_info | 60 / hour | Cached, light. |
+| search_domains | 20 / hour | Each call scrapes 6 registrars. Most expensive. |
+| valuate_domain | 20 / hour | Gemini on cache miss. Repeat valuations are free. |
 
-3. **Streaming**: Results stream via SSE as each registrar completes. Fast registrars (Dynadot, Name.com) return in ~2-5s; slower ones (GoDaddy, Porkbun) may take 10-15s.
+- Windows are rolling-hour, starting from your first request.
+- Exceeding a bucket returns the error inside a tool-result content block (your AI can read and explain it).
+- Repeat lookups of the same domain hit the Postgres cache (~50ms) and don't burn quota beyond the per-bucket limit on the original call.
 
-## Notes
+---
 
-- No authentication required; rate-limited per IP (20 req/hr search, 60 req/hr domain info)
-- Response time: ~5-15 seconds for search (registrar scraping is the bottleneck), ~50ms cache-hit / 500ms–2s cold for domain info
-- Prices are live — scraped from registrar websites in real-time, not cached
-- Privacy: owner contact details only shown when the registrant hasn't opted into privacy protection
-- Some registrars (GoDaddy, Porkbun) may intermittently fail — check the `sources` array in the response to see which succeeded
-- The `registerUrl` field gives you a direct link to purchase at the cheapest registrar — use this for one-click buy flows
+## Example prompts
+
+- "Is ad402.sh available? When does it expire?"
+- "Find me a cheap .io domain for a craft-beer brand under $20/yr."
+- "Who owns github.com and when does it expire?"
+- "What's crypto.com worth? What about the alternatives?"
+- "Check who owns these 5 domains: github.com, openai.com, anthropic.com, cloudflare.com, stripe.com."
+
+---
+
+## How the pipeline works
+
+When `get_domain_info` or `check_domain_availability` is called:
+
+1. Postgres cache is checked. If fresh, returned in ~50ms.
+2. On miss, in parallel:
+   - **DNS-over-HTTPS** (Cloudflare) for nameservers and resolution status
+   - **RDAP** if the TLD has an IANA-registered RDAP server
+   - **WHOIS port-43** otherwise (or as fallback if RDAP returns sparse data)
+3. If domain is registered but registrar/dates are still missing, Firecrawl scrapes `who.is` as last resort.
+4. Result is written to cache with adaptive TTL:
+   - Full data, registered: 24h
+   - Partial data, registered: 6h
+   - Unregistered: 1h
+   - Pending-delete or near-expiry: 1h
+   - Error: 5min
+
+When `search_domains` is called, all 6 registrar search pages are scraped in parallel via Firecrawl. Pricing is merged and the cheapest option marked `isCheapest: true`.
+
+---
+
+## Troubleshooting
+
+- **My client doesn't accept a URL** — use Option B (npx) until you upgrade your client.
+- **Rate limit exceeded** — wait for the rolling-hour window to reset, or reduce call frequency.
+- **Slow first search** — `search_domains` cold takes 5-15s (parallel scraping). Cached subsequent reads are fast.
+- **Higher limits needed** — open an issue: https://github.com/adipundir/donadomains/issues.
+
+---
+
+## Source
+
+Repo: https://github.com/adipundir/donadomains
+npm: https://www.npmjs.com/package/donadomains-mcp
+License: MIT

@@ -14,17 +14,6 @@ function Badge({ children, color = "accent" }: { children: React.ReactNode; colo
   );
 }
 
-function MethodBadge({ method }: { method: string }) {
-  return (
-    <span
-      className="inline-block px-2 py-0.5 text-xs font-bold rounded font-comic-body mr-2"
-      style={{ background: "var(--green)", color: "#fff" }}
-    >
-      {method}
-    </span>
-  );
-}
-
 function FieldRow({ name, type, desc, optional }: { name: string; type: string; desc: string; optional?: boolean }) {
   return (
     <div
@@ -57,85 +46,31 @@ function Section({ id, title, children }: { id: string; title: string; children:
   );
 }
 
-const EXAMPLE_INTEL_RESPONSE = `{
-  "domain": "example.com",
-  "registered": true,
-  "status": [
-    "client delete prohibited",
-    "client transfer prohibited",
-    "client update prohibited"
-  ],
-  "created": "1995-08-14T04:00:00Z",
-  "updated": "2024-08-14T07:01:44Z",
-  "expires": "2025-08-13T04:00:00Z",
-  "registrar": "RESERVED-Internet Assigned Numbers Authority",
-  "nameservers": [
-    "a.iana-servers.net",
-    "b.iana-servers.net"
-  ],
-  "sources": ["rdap", "dns"],
-  "timing": {
-    "rdap": 342,
-    "dns": 87
+const NAV_ITEMS = [
+  { id: "overview", label: "Overview" },
+  { id: "install", label: "Install" },
+  { id: "tools", label: "Tools" },
+  { id: "rate-limits", label: "Rate Limits" },
+  { id: "examples", label: "Examples" },
+  { id: "troubleshooting", label: "Troubleshooting" },
+];
+
+const CONFIG_URL = `{
+  "mcpServers": {
+    "donadomains": {
+      "url": "https://donadomains.xyz/api/mcp"
+    }
   }
 }`;
 
-const EXAMPLE_SEARCH_JSON = `{
-  "keyword": "example",
-  "tld": null,
-  "results": [
-    {
-      "domain": "example.xyz",
-      "available": true,
-      "tld": ".xyz",
-      "matchType": "exact",
-      "buyLinks": [
-        {
-          "name": "Dynadot",
-          "url": "https://dynadot.com/...",
-          "price": "$13.17/yr",
-          "priceNum": 13.17,
-          "source": "scraped"
-        },
-        {
-          "name": "GoDaddy",
-          "url": "https://godaddy.com/...",
-          "price": "$0.99/yr",
-          "priceNum": 0.99,
-          "isCheapest": true,
-          "source": "scraped"
-        }
-      ],
-      "registerUrl": "https://godaddy.com/..."
-    },
-    {
-      "domain": "example.com",
-      "available": false,
-      "tld": ".com",
-      "matchType": "exact",
-      "buyLinks": []
+const CONFIG_NPX = `{
+  "mcpServers": {
+    "donadomains": {
+      "command": "npx",
+      "args": ["-y", "donadomains-mcp"]
     }
-  ],
-  "sources": [
-    { "name": "Dynadot", "status": "ok", "count": 45, "durationMs": 6821 },
-    { "name": "Name.com", "status": "ok", "count": 27, "durationMs": 8234 },
-    { "name": "GoDaddy", "status": "ok", "count": 33, "durationMs": 12450 },
-    { "name": "Namecheap", "status": "ok", "count": 6, "durationMs": 9102 },
-    { "name": "Hover", "status": "ok", "count": 490, "durationMs": 11873 },
-    { "name": "Porkbun", "status": "failed", "count": 0, "durationMs": 20000, "error": "timeout" }
-  ]
+  }
 }`;
-
-const NAV_ITEMS = [
-  { id: "free-api", label: "API", heading: true },
-  { id: "domain-search", label: "Search" },
-  { id: "domain-info", label: "Info" },
-  { id: "domain-valuate", label: "Valuate" },
-  { id: "mcp", label: "MCP (AI Agents)", heading: true },
-  { id: "mcp-install", label: "Install" },
-  { id: "mcp-tools", label: "Tools" },
-  { id: "rate-limits", label: "Rate Limits" },
-];
 
 export default function DocsPage() {
   return (
@@ -155,7 +90,7 @@ export default function DocsPage() {
           <div className="flex items-center gap-3 sm:gap-4">
             <CopyDocsButton />
             <span className="font-comic-title text-xs sm:text-sm uppercase tracking-wide opacity-60">
-              API
+              MCP Docs
             </span>
             <ThemeSwitcher />
           </div>
@@ -165,483 +100,394 @@ export default function DocsPage() {
       <div className="px-4 sm:px-6 md:px-8 py-8 sm:py-12">
         <div className="max-w-6xl mx-auto flex gap-6">
 
-        {/* Sidebar */}
-        <SidebarNav items={NAV_ITEMS} />
+          {/* Sidebar */}
+          <SidebarNav items={NAV_ITEMS} />
 
-        {/* Main content */}
-        <main className="flex-1 min-w-0 space-y-12">
-          {/* Intro */}
-          <div>
-            <h1 className="font-comic-title text-3xl sm:text-4xl uppercase tracking-wide mb-3">
-              API <span style={{ color: "var(--accent)" }}>Docs</span>
-            </h1>
-            <p className="font-comic-body text-base opacity-70 max-w-2xl">
-              Free, unauthenticated API for domain search and intelligence.
-              Search across 6 registrars for live pricing, or look up detailed RDAP/WHOIS/DNS info for any domain.
-            </p>
-          </div>
-
-          {/* Endpoints overview */}
-          <div id="free-api" className="scroll-mt-24" />
-          <div className="rounded-lg p-5 space-y-4" style={{ background: "var(--surface)", border: "2px solid var(--border-light)" }}>
-            <div>
-              <p className="font-comic-title text-lg uppercase tracking-wide">3 Endpoints + MCP Server</p>
-            </div>
-            <div className="p-3 rounded-lg" style={{ background: "var(--surface-muted)" }}>
-              <p className="font-comic-title text-[10px] uppercase tracking-widest opacity-50 mb-1">Base URL</p>
-              <code className="text-base font-bold">https://donadomains.xyz</code>
-            </div>
-            <div className="space-y-2">
-              <a
-                href="#domain-search"
-                className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:opacity-80"
-                style={{ background: "var(--surface-muted)" }}
-              >
-                <Badge color="green">GET</Badge>
-                <div>
-                  <code className="text-sm font-bold">/api/search?q=&#123;keyword&#125;</code>
-                  <p className="font-comic-body text-sm opacity-70 mt-0.5">Search domain availability and compare prices across 6 registrars.</p>
-                </div>
-              </a>
-              <a
-                href="#domain-info"
-                className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:opacity-80"
-                style={{ background: "var(--surface-muted)" }}
-              >
-                <Badge color="green">GET</Badge>
-                <div>
-                  <code className="text-sm font-bold">/api/domain/&#123;domain&#125;</code>
-                  <p className="font-comic-body text-sm opacity-70 mt-0.5">Look up detailed info for a single domain — registrar, dates, owner, nameservers, status.</p>
-                </div>
-              </a>
-              <a
-                href="#domain-valuate"
-                className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:opacity-80"
-                style={{ background: "var(--surface-muted)" }}
-              >
-                <Badge color="green">GET</Badge>
-                <div>
-                  <code className="text-sm font-bold">/api/valuate/&#123;domain&#125;</code>
-                  <p className="font-comic-body text-sm opacity-70 mt-0.5">AI-powered valuation — score, tier, USD range, reasoning, factors.</p>
-                </div>
-              </a>
-              <a
-                href="#mcp"
-                className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:opacity-80"
-                style={{ background: "var(--surface-muted)" }}
-              >
+          {/* Main content */}
+          <main className="flex-1 min-w-0 space-y-12">
+            {/* Hero */}
+            <div id="overview" className="scroll-mt-24">
+              <div className="flex items-center gap-3 mb-3">
                 <Badge>MCP</Badge>
-                <div>
-                  <code className="text-sm font-bold">https://donadomains.xyz/api/mcp</code>
-                  <p className="font-comic-body text-sm opacity-70 mt-0.5">Hosted MCP server for Claude Desktop, Cursor, Continue, Windsurf, Zed, Claude.ai — connect by URL, no install.</p>
-                </div>
-              </a>
+                <Badge color="green">Free</Badge>
+              </div>
+              <h1 className="font-comic-title text-3xl sm:text-4xl uppercase tracking-wide mb-3">
+                Donadomains <span style={{ color: "var(--accent)" }}>MCP</span>
+              </h1>
+              <p className="font-comic-body text-base opacity-80 max-w-2xl mb-3">
+                Give your AI agent real-time domain superpowers. Check availability, compare prices
+                across 6 registrars, look up WHOIS/RDAP intel for any TLD (including <code>.sh</code>,
+                <code> .io</code>, <code>.ac</code>), and estimate domain value — all from inside
+                Claude Desktop, Cursor, Continue, Windsurf, Zed, or Claude.ai.
+              </p>
+              <p className="font-comic-body text-sm opacity-60">
+                Free. No signup. No API key. Connect by URL.
+              </p>
             </div>
-          </div>
 
-          {/* ── Endpoint 1: Domain Search ── */}
-          <Section id="domain-search" title="Domain Search">
+            {/* What it does */}
             <div
-              className="rounded-lg p-4 comic-border-subtle"
-              style={{ background: "var(--surface)" }}
+              className="rounded-lg p-5 space-y-3"
+              style={{ background: "var(--surface)", border: "2px solid var(--border-light)" }}
             >
-              <div className="flex items-center gap-2 mb-2">
-                <MethodBadge method="GET" />
-                <code className="text-base font-bold">/api/search?q=&#123;keyword&#125;</code>
-              </div>
-              <p className="opacity-70 text-sm">
-                Search domain availability across 6 registrars with live pricing.
-              </p>
-            </div>
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">Parameters</h3>
-            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <FieldRow
-                name="q"
-                type="string"
-                desc='Search keyword. Can be a bare word (e.g. "donadomains") or a full domain (e.g. "donadomains.xyz"). Registrars dynamically discover available TLDs for the keyword.'
-              />
-              <FieldRow
-                name="stream"
-                type="string"
-                desc='Set to "true" for real-time streaming via Server-Sent Events. Omit for a single JSON response.'
-                optional
-              />
-            </div>
-
-            {/* ── Mode 1: JSON (default) ── */}
-            <div className="mt-8 p-4 rounded-lg" style={{ border: "2px solid var(--border-light)" }}>
-              <div className="flex items-center gap-2 mb-1">
-                <Badge>Default</Badge>
-                <h3 className="font-comic-title text-lg">JSON Response</h3>
-              </div>
-              <p className="opacity-70 text-sm mb-4">
-                Waits for all registrars to respond, then returns a single JSON object. Takes 5-15 seconds. Best for scripts, bots, and backend integrations.
-              </p>
-
-              <CodeBlock title="curl">{`curl "https://donadomains.xyz/api/search?q=donadomains"`}</CodeBlock>
-              <TabbedCode tabs={[
-                { label: "JavaScript", code: `const res = await fetch(
-  "https://donadomains.xyz/api/search?q=donadomains"
-);
-const data = await res.json();
-
-// Available domains with pricing
-const available = data.results.filter(r => r.available);
-console.log(\`\${available.length} domains available\`);
-
-// Cheapest option
-const cheapest = available
-  .flatMap(r => r.buyLinks ?? [])
-  .find(l => l.isCheapest);
-console.log(cheapest?.name, cheapest?.price);` },
-                { label: "Python", code: `import requests
-
-res = requests.get("https://donadomains.xyz/api/search", params={"q": "donadomains"})
-data = res.json()
-
-# Available domains with pricing
-available = [r for r in data["results"] if r["available"]]
-print(f"{len(available)} domains available")
-
-# Cheapest option
-for domain in available:
-    for link in domain.get("buyLinks", []):
-        if link.get("isCheapest"):
-            print(f"{link['name']} — {link['price']}")` },
-              ]} />
-
-              <p className="font-comic-title text-sm mt-4 mb-2">Example Response</p>
-              <CodeBlock title="JSON">{EXAMPLE_SEARCH_JSON}</CodeBlock>
-            </div>
-
-            {/* ── Mode 2: Stream ── */}
-            <div className="mt-4 p-4 rounded-lg" style={{ border: "2px solid var(--border-light)" }}>
-              <div className="flex items-center gap-2 mb-1">
-                <Badge color="green">Advanced</Badge>
-                <h3 className="font-comic-title text-lg">Streaming Response</h3>
-              </div>
-              <p className="opacity-70 text-sm mb-4">
-                Results arrive progressively via Server-Sent Events as each registrar completes. Registrar results stream in over 2-15 seconds. Best for building real-time UIs with progress indicators.
-              </p>
-
-              <CodeBlock title="curl">{`curl -N "https://donadomains.xyz/api/search?q=donadomains&stream=true"`}</CodeBlock>
-              <TabbedCode tabs={[
-                { label: "JavaScript", code: `const res = await fetch(
-  "https://donadomains.xyz/api/search?q=donadomains&stream=true"
-);
-const reader = res.body.getReader();
-const decoder = new TextDecoder();
-let buffer = "";
-
-while (true) {
-  const { done, value } = await reader.read();
-  if (done) break;
-  buffer += decoder.decode(value, { stream: true });
-
-  const parts = buffer.split("\\n\\n");
-  buffer = parts.pop() ?? "";
-
-  for (const part of parts) {
-    const line = part.split("\\n").find(l => l.startsWith("data: "));
-    if (!line) continue;
-    const event = JSON.parse(line.slice(6));
-
-    if (event.type === "batch") {
-      console.log(event.registrar, "done:", event.results.length, "results");
-    } else if (event.type === "complete") {
-      console.log("Search complete");
-    }
-  }
-}` },
-                { label: "Python", code: `import requests
-import json
-
-res = requests.get(
-    "https://donadomains.xyz/api/search",
-    params={"q": "donadomains", "stream": "true"},
-    stream=True,
-)
-
-for line in res.iter_lines():
-    line = line.decode()
-    if not line.startswith("data: "):
-        continue
-    event = json.loads(line[6:])
-
-    if event["type"] == "batch":
-        print(f"{event['registrar']} done: {len(event['results'])} results")
-    elif event["type"] == "complete":
-        print("Search complete")
-        break` },
-              ]} />
-
-              <p className="font-comic-title text-sm mt-4 mb-2">Event Types</p>
-              <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-                <FieldRow name="init" type="event" desc="Sent first. Contains the list of registrar names being scraped (Dynadot, Name.com, GoDaddy, Namecheap, Hover, Porkbun)." />
-                <FieldRow name="batch" type="event" desc="Sent each time a registrar completes. Contains the full merged results so far, plus source statuses." />
-                <FieldRow name="complete" type="event" desc="All sources finished. Stream closes after this." />
-              </div>
-            </div>
-
-            {/* ── Shared fields ── */}
-            <h3 className="font-comic-title text-xl mt-8 mb-2">Result Fields</h3>
-            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <FieldRow name="domain" type="string" desc="Fully qualified domain name (e.g. example.com)" />
-              <FieldRow name="available" type="boolean" desc="Whether the domain is available for registration" />
-              <FieldRow name="tld" type="string" desc="TLD including dot (e.g. '.com')" />
-              <FieldRow name="matchType" type="string" desc='"exact" if TLD matches user query, "similar" otherwise' optional />
-              <FieldRow name="buyLinks" type="BuyLink[]" desc="Purchase links from registrars with pricing (empty array for taken domains)" />
-              <FieldRow name="registerUrl" type="string" desc="Direct URL to register at the cheapest registrar" optional />
-            </div>
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">BuyLink Fields</h3>
-            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <FieldRow name="name" type="string" desc="Registrar name (e.g. GoDaddy, Dynadot, Hover)" />
-              <FieldRow name="url" type="string" desc="Direct purchase URL — takes user to checkout" />
-              <FieldRow name="price" type="string" desc='Formatted price (e.g. "$9.99/yr")' optional />
-              <FieldRow name="priceNum" type="number" desc="Numeric price for sorting/comparison" optional />
-              <FieldRow name="isCheapest" type="boolean" desc="True if this is the cheapest option across all registrars" optional />
-              <FieldRow name="premium" type="boolean" desc="True if this is a premium/aftermarket listing" optional />
-              <FieldRow name="source" type="string" desc='Always "scraped" — prices are live-scraped from registrar websites' />
-            </div>
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">SourceStatus Fields</h3>
-            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <FieldRow name="name" type="string" desc="Registrar name (e.g. GoDaddy, Dynadot)" />
-              <FieldRow name="status" type="string" desc='"ok" if the registrar returned results, "failed" if it timed out or errored' />
-              <FieldRow name="count" type="number" desc="Number of domain hits returned (0 if failed)" />
-              <FieldRow name="durationMs" type="number" desc="Time in milliseconds the registrar scrape took" />
-              <FieldRow name="error" type="string" desc="Error message when status is failed (e.g. timeout)" optional />
-            </div>
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">Error Responses</h3>
-            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <FieldRow name="400" type="Bad Request" desc='Missing or invalid q parameter' />
-              <FieldRow name="500" type="Server Error" desc="Unexpected internal error" />
-            </div>
-          </Section>
-
-          {/* ── Endpoint 2: Domain Info ── */}
-          <Section id="domain-info" title="Domain Info">
-            <div
-              className="rounded-lg p-4 comic-border-subtle"
-              style={{ background: "var(--surface)" }}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <MethodBadge method="GET" />
-                <code className="text-base font-bold">/api/domain/&#123;domain&#125;</code>
-              </div>
-              <p className="opacity-70 text-sm">
-                Returns comprehensive domain intelligence from RDAP, DNS-over-HTTPS, and who.is scraping.
-                Layered approach fills in gaps from multiple sources.
-              </p>
-            </div>
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">Path Parameters</h3>
-            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <FieldRow
-                name="domain"
-                type="string"
-                desc='Fully qualified domain name (e.g. "example.com"). Must match the pattern: lowercase alphanumeric with dots/hyphens, ending in a valid TLD.'
-              />
-            </div>
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">Examples</h3>
-            <CodeBlock title="curl">{`curl "https://donadomains.xyz/api/domain/example.com"`}</CodeBlock>
-            <TabbedCode tabs={[
-              { label: "JavaScript", code: `const res = await fetch(
-  "https://donadomains.xyz/api/domain/example.com"
-);
-const intel = await res.json();
-
-console.log(intel.registered);  // true
-console.log(intel.registrar);   // "RESERVED-Internet Assigned Numbers Authority"
-console.log(intel.nameservers); // ["a.iana-servers.net", "b.iana-servers.net"]
-console.log(intel.sources);     // ["rdap", "dns"]` },
-              { label: "Python", code: `import requests
-
-res = requests.get("https://donadomains.xyz/api/domain/example.com")
-intel = res.json()
-
-print(intel["registered"])   # True
-print(intel["registrar"])    # "RESERVED-Internet Assigned Numbers Authority"
-print(intel["nameservers"])  # ["a.iana-servers.net", "b.iana-servers.net"]
-print(intel["sources"])      # ["rdap", "dns"]` },
-            ]} />
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">Example Response</h3>
-            <CodeBlock title="JSON">{EXAMPLE_INTEL_RESPONSE}</CodeBlock>
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">Response Fields</h3>
-            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <FieldRow name="domain" type="string" desc="The normalized domain that was queried" />
-              <FieldRow name="registered" type="boolean" desc="Whether the domain is currently registered" />
-              <FieldRow name="status" type="string[]" desc="ICANN domain status codes (e.g. clientTransferProhibited)" optional />
-              <FieldRow name="created" type="string" desc="Creation date (ISO 8601)" optional />
-              <FieldRow name="updated" type="string" desc="Last updated date (ISO 8601)" optional />
-              <FieldRow name="expires" type="string" desc="Expiration date (ISO 8601)" optional />
-              <FieldRow name="registrar" type="string" desc="Name of the registrar" optional />
-              <FieldRow name="registrarUrl" type="string" desc="Registrar website URL" optional />
-              <FieldRow name="registrant" type="string" desc="Name of the registrant (often redacted for privacy)" optional />
-              <FieldRow name="organization" type="string" desc="Registrant organization" optional />
-              <FieldRow name="contactEmail" type="string" desc="Registrant contact email (only shown when not privacy-protected)" optional />
-              <FieldRow name="contactPhone" type="string" desc="Contact phone number" optional />
-              <FieldRow name="contactAddress" type="string" desc="Registrant address (partial, often redacted)" optional />
-              <FieldRow name="nameservers" type="string[]" desc="Authoritative nameservers for the domain" optional />
-              <FieldRow name="dnssec" type="string" desc='DNSSEC status (e.g. "signedDelegation")' optional />
-              <FieldRow name="sources" type="string[]" desc='Data sources used: "rdap", "dns", "who.is"' />
-              <FieldRow name="timing" type="object" desc="Milliseconds spent per source (e.g. { rdap: 342, dns: 87 })" />
-            </div>
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">Error Responses</h3>
-            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <FieldRow name="400" type="Bad Request" desc='Invalid domain format' />
-              <FieldRow name="504" type="Gateway Timeout" desc="Request took longer than 10 seconds" />
-              <FieldRow name="500" type="Server Error" desc="Unexpected internal error" />
-            </div>
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">Data Sources</h3>
-            <p className="opacity-80">
-              Domain intelligence is gathered in layers, with each source filling gaps left by previous ones:
-            </p>
-            <ol className="list-decimal list-inside space-y-2 mt-2 opacity-80">
-              <li>
-                <strong>RDAP</strong> — Registration Data Access Protocol. Free, HTTP-based. Used for TLDs that publish an RDAP server (most gTLDs).
-              </li>
-              <li>
-                <strong>WHOIS port-43</strong> — Classic port-43 WHOIS. Used for TLDs without RDAP (e.g. <code>.sh</code>, <code>.io</code>, <code>.ac</code>) and as a fallback when RDAP returns incomplete data.
-              </li>
-              <li>
-                <strong>DNS-over-HTTPS</strong> — Cloudflare DoH queries. Fast (~50ms). Resolves nameservers and confirms resolution.
-              </li>
-              <li>
-                <strong>who.is scrape</strong> — Firecrawl-powered last-resort fallback. Only fires when the registered domain still has no registrar/dates after the layers above.
-              </li>
-            </ol>
-          </Section>
-
-          {/* ── Endpoint 3: Valuate ── */}
-          <Section id="domain-valuate" title="Domain Valuation">
-            <div
-              className="rounded-lg p-4 comic-border-subtle"
-              style={{ background: "var(--surface)" }}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <MethodBadge method="GET" />
-                <code className="text-base font-bold">/api/valuate/&#123;domain&#125;</code>
-              </div>
-              <p className="opacity-70 text-sm">
-                AI-powered domain valuation using Google Gemini. Returns score (0-100), tier (common/decent/premium/ultra), USD range, reasoning, and per-factor breakdown. Cached in Postgres forever — repeat lookups are free.
-              </p>
-            </div>
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">Query Parameters</h3>
-            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <FieldRow name="registered" type="boolean" desc="Optional. Skip the registration lookup if you already know." optional />
-              <FieldRow name="isPremium" type="boolean" desc="Optional. Flag this as a registrar-premium domain." optional />
-              <FieldRow name="registrationPrice" type="number" desc="Optional. Current registration price in USD." optional />
-            </div>
-
-            <h3 className="font-comic-title text-xl mt-6 mb-2">Example</h3>
-            <CodeBlock title="curl">{`curl "https://donadomains.xyz/api/valuate/crypto.com"`}</CodeBlock>
-          </Section>
-
-          {/* ── MCP for AI Agents ── */}
-          <Section id="mcp" title="MCP Server (for AI Agents)">
-            <div
-              className="rounded-lg p-4 comic-border-subtle"
-              style={{ background: "var(--surface)" }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <Badge>MCP</Badge>
-                <Badge color="green">stdio</Badge>
-              </div>
-              <p className="opacity-80 mb-2">
-                <strong>donadomains-mcp</strong> is a Model Context Protocol server distributed via npm. Drop it into Claude Desktop, Cursor, Continue, Windsurf, or Zed and your AI gains real-time domain superpowers.
-              </p>
-              <p className="opacity-70 text-sm">
-                Ask Claude: <em>"is ad402.sh available?"</em> · <em>"find a cheap .io domain for craftbeer"</em> · <em>"who owns github.com and when does it expire?"</em> · <em>"what's crypto.com worth?"</em>
-              </p>
-            </div>
-          </Section>
-
-          <Section id="mcp-install" title="MCP Install">
-            <p className="opacity-80 mb-3">Two transports. Pick whichever your client supports — both are zero-config.</p>
-
-            <p className="font-comic-title text-sm uppercase tracking-wide mt-4 mb-2">Option A — URL <span className="opacity-60">(recommended)</span></p>
-            <p className="opacity-70 text-sm mb-2">
-              For clients that speak Streamable HTTP transport: Claude Desktop ≥ 0.7, Claude.ai web Connectors, Cursor ≥ 0.41, Windsurf, Continue, Zed. Zero install, instant updates, no Node.js required.
-            </p>
-            <CodeBlock title="config">{`{
-  "mcpServers": {
-    "donadomains": {
-      "url": "https://donadomains.xyz/api/mcp"
-    }
-  }
-}`}</CodeBlock>
-
-            <p className="font-comic-title text-sm uppercase tracking-wide mt-6 mb-2">Option B — npx (stdio)</p>
-            <p className="opacity-70 text-sm mb-2">
-              For clients that only support stdio transport. Requires Node.js ≥ 18.
-            </p>
-            <CodeBlock title="claude_desktop_config.json / cursor / windsurf">{`{
-  "mcpServers": {
-    "donadomains": {
-      "command": "npx",
-      "args": ["-y", "donadomains-mcp"]
-    }
-  }
-}`}</CodeBlock>
-            <p className="opacity-60 text-sm mt-3">
-              Per-client config locations and Zed/Continue variants are in the <a className="underline" style={{ color: "var(--accent)" }} href="https://github.com/adipundir/donadomains/tree/main/mcp">mcp/README</a>.
-            </p>
-          </Section>
-
-          <Section id="mcp-tools" title="MCP Tools">
-            <div className="rounded-lg overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-              <FieldRow name="check_domain_availability" type="domain" desc="Returns availability + best price OR ownership info. Works for all TLDs incl. RDAP-less ccTLDs via WHOIS port-43." />
-              <FieldRow name="search_domains" type="keyword, limit?, tldFilter?, includeTaken?" desc="Search across 6 registrars, return available domains with prices." />
-              <FieldRow name="get_domain_info" type="domain" desc="Deep WHOIS/RDAP/DNS intel — registrar, dates, nameservers, status, DNSSEC." />
-              <FieldRow name="valuate_domain" type="domain, registered?, isPremium?, registrationPrice?" desc="AI-powered valuation. Score, tier, USD range, reasoning, factors." />
-            </div>
-          </Section>
-
-          {/* Rate Limits */}
-          <Section id="rate-limits" title="Rate Limits">
-            <div
-              className="rounded-lg p-4 comic-border-subtle"
-              style={{ background: "var(--surface)" }}
-            >
-              <p className="opacity-80 mb-3">
-                The API is rate-limited per IP address to keep things fair:
-              </p>
-              <div className="rounded-lg overflow-hidden mb-4" style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}>
-                <FieldRow name="/api/search" type="20 req/hr" desc="Each search scrapes 6 registrars — expensive upstream" />
-                <FieldRow name="/api/domain/{domain}" type="60 req/hr" desc="Lightweight RDAP + WHOIS + DNS lookups (read-through cached)" />
-                <FieldRow name="/api/valuate/{domain}" type="20 req/hr" desc="Gemini calls cost money — first call uncached, repeat calls free" />
-                <FieldRow name="/api/mcp (overall)" type="200 req/hr" desc="MCP JSON-RPC frames; per-tool calls also count toward the bucket of the underlying endpoint" />
-              </div>
-              <p className="opacity-70 text-sm mb-3">
-                IPv6 addresses are normalized to their /64 prefix before being used as the rate-limit key.
-              </p>
-              <ul className="list-disc list-inside space-y-1.5 opacity-80">
-                <li>Rate limits reset every hour from your first request</li>
-                <li>Exceeding the limit returns <strong>429 Too Many Requests</strong></li>
-                <li>The search endpoint may take 5-15 seconds (registrar scraping)</li>
-                <li>The domain info endpoint has a 10 second timeout</li>
+              <p className="font-comic-title text-lg uppercase tracking-wide">Try asking your AI</p>
+              <ul className="list-disc list-inside space-y-1.5 opacity-80 font-comic-body">
+                <li>&quot;Is <code>donataxes.com</code> available? What about <code>.io</code>?&quot;</li>
+                <li>&quot;Find me a cheap, brandable domain for a craft-beer brand under $20/yr.&quot;</li>
+                <li>&quot;Who owns <code>github.com</code> and when does it expire?&quot;</li>
+                <li>&quot;What&apos;s <code>crypto.com</code> roughly worth?&quot;</li>
+                <li>&quot;Is <code>ad402.sh</code> taken? When does it expire?&quot;</li>
               </ul>
             </div>
-          </Section>
 
-          {/* Footer */}
-          <div
-            className="pt-8 mt-8 text-center font-comic-body text-sm opacity-50"
-            style={{ borderTop: "1px solid var(--border-light)" }}
-          >
-            Donadomains API Docs
-          </div>
-        </main>
+            {/* Install */}
+            <Section id="install" title="Install">
+              <p className="opacity-80">
+                Two ways to connect. Pick whichever your client supports — both are free, neither needs
+                an account.
+              </p>
+
+              <div className="mt-4">
+                <p className="font-comic-title text-sm uppercase tracking-wide mb-2">
+                  Option A — URL <span className="opacity-60">(recommended)</span>
+                </p>
+                <p className="opacity-70 text-sm mb-3">
+                  For clients that speak the <strong>Streamable HTTP</strong> transport:
+                  Claude Desktop ≥ 0.7, Claude.ai web Connectors, Cursor ≥ 0.41, Windsurf,
+                  Continue, Zed. Zero install. Instant updates. No Node.js required.
+                </p>
+                <CodeBlock title="config">{CONFIG_URL}</CodeBlock>
+
+                <p className="opacity-70 text-sm mt-4">
+                  Or in Claude.ai web: Settings → <em>Connectors</em> → <em>Add custom</em> →
+                  paste <code>https://donadomains.xyz/api/mcp</code>.
+                </p>
+              </div>
+
+              <div className="mt-8">
+                <p className="font-comic-title text-sm uppercase tracking-wide mb-2">
+                  Option B — npx (stdio fallback)
+                </p>
+                <p className="opacity-70 text-sm mb-3">
+                  For clients that only support stdio transport. Requires Node.js ≥ 18.
+                </p>
+                <CodeBlock title="config">{CONFIG_NPX}</CodeBlock>
+              </div>
+
+              <p className="opacity-60 text-sm mt-4">
+                Per-client config-file locations are in the{" "}
+                <a
+                  className="underline"
+                  style={{ color: "var(--accent)" }}
+                  href="https://github.com/adipundir/donadomains/tree/main/mcp"
+                >
+                  mcp/README
+                </a>
+                .
+              </p>
+            </Section>
+
+            {/* Tools */}
+            <Section id="tools" title="Tools">
+              <p className="opacity-80 mb-3">
+                Four tools your AI can call. Tool descriptions are tuned so the AI picks the
+                right one automatically — you don&apos;t need to name them in prompts.
+              </p>
+
+              <div className="space-y-4">
+                {/* check_domain_availability */}
+                <div
+                  className="rounded-lg p-4 comic-border-subtle"
+                  style={{ background: "var(--surface)" }}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge color="green">check_domain_availability</Badge>
+                  </div>
+                  <p className="opacity-80 text-sm mb-2">
+                    Check if a specific domain is available right now. Returns availability +
+                    lowest price + buy URL if free, or registrar + dates + nameservers if taken.
+                    Handles RDAP-less ccTLDs (<code>.sh</code>, <code>.io</code>, <code>.ac</code>,
+                    <code> .ws</code>) via port-43 WHOIS.
+                  </p>
+                  <div
+                    className="rounded-lg overflow-hidden"
+                    style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}
+                  >
+                    <FieldRow name="domain" type="string" desc="Fully qualified domain, e.g. 'example.com' or 'ad402.sh'." />
+                  </div>
+                </div>
+
+                {/* search_domains */}
+                <div
+                  className="rounded-lg p-4 comic-border-subtle"
+                  style={{ background: "var(--surface)" }}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge color="green">search_domains</Badge>
+                  </div>
+                  <p className="opacity-80 text-sm mb-2">
+                    Search for available domains across GoDaddy, Namecheap, Dynadot, Hover,
+                    Name.com, and Porkbun. Returns prices, the cheapest registrar, and direct
+                    buy URLs. Best for brand/startup/product naming.
+                  </p>
+                  <div
+                    className="rounded-lg overflow-hidden"
+                    style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}
+                  >
+                    <FieldRow name="keyword" type="string" desc="Bare word ('startup') or full domain ('startup.io')." />
+                    <FieldRow name="limit" type="number" desc="Max results (default 20, max 50)." optional />
+                    <FieldRow name="tldFilter" type="string" desc="Only return this TLD, e.g. '.com'. Include the leading dot." optional />
+                    <FieldRow name="includeTaken" type="boolean" desc="Include taken domains in the results (default false)." optional />
+                  </div>
+                </div>
+
+                {/* get_domain_info */}
+                <div
+                  className="rounded-lg p-4 comic-border-subtle"
+                  style={{ background: "var(--surface)" }}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge color="green">get_domain_info</Badge>
+                  </div>
+                  <p className="opacity-80 text-sm mb-2">
+                    Deep WHOIS / RDAP / DNS intel for a registered domain — registrar,
+                    creation and expiry dates, nameservers, registrant (if not privacy-protected),
+                    DNSSEC status, and ICANN status codes.
+                  </p>
+                  <div
+                    className="rounded-lg overflow-hidden"
+                    style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}
+                  >
+                    <FieldRow name="domain" type="string" desc="Fully qualified domain, e.g. 'github.com'." />
+                  </div>
+                </div>
+
+                {/* valuate_domain */}
+                <div
+                  className="rounded-lg p-4 comic-border-subtle"
+                  style={{ background: "var(--surface)" }}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge color="green">valuate_domain</Badge>
+                  </div>
+                  <p className="opacity-80 text-sm mb-2">
+                    AI-powered domain valuation. Returns score (0-100), tier
+                    (common/decent/premium/ultra), estimated USD range, reasoning, and per-factor
+                    breakdown (TLD value, length, brandability, keyword strength, age).
+                    Results are cached server-side, so repeat valuations are instant and free.
+                  </p>
+                  <div
+                    className="rounded-lg overflow-hidden"
+                    style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}
+                  >
+                    <FieldRow name="domain" type="string" desc="Domain to value, e.g. 'crypto.com'." />
+                    <FieldRow name="registered" type="boolean" desc="Skip the registration lookup if you already know." optional />
+                    <FieldRow name="isPremium" type="boolean" desc="Flag a registrar-premium domain (anchors valuation up)." optional />
+                    <FieldRow name="registrationPrice" type="number" desc="Current registration price in USD." optional />
+                  </div>
+                </div>
+              </div>
+            </Section>
+
+            {/* Rate Limits */}
+            <Section id="rate-limits" title="Rate Limits">
+              <p className="opacity-80">
+                Donadomains MCP is <strong>free</strong> and unauthenticated. To keep it usable for
+                everyone, calls are rate-limited per source IP. IPv6 addresses are normalized to
+                their <code>/64</code> prefix before being counted.
+              </p>
+
+              <div
+                className="rounded-lg overflow-hidden mt-4"
+                style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}
+              >
+                <FieldRow
+                  name="Overall MCP frames"
+                  type="200 / hour"
+                  desc="Every JSON-RPC frame counts. Catch-all to stop abuse."
+                />
+                <FieldRow
+                  name="check_domain_availability"
+                  type="60 / hour"
+                  desc="Light, mostly cached. Same bucket as get_domain_info."
+                />
+                <FieldRow
+                  name="get_domain_info"
+                  type="60 / hour"
+                  desc="Light, mostly cached."
+                />
+                <FieldRow
+                  name="search_domains"
+                  type="20 / hour"
+                  desc="Each call scrapes all 6 registrars. Most expensive."
+                />
+                <FieldRow
+                  name="valuate_domain"
+                  type="20 / hour"
+                  desc="Calls Gemini on cache miss. Repeat valuations are free."
+                />
+              </div>
+
+              <ul className="list-disc list-inside space-y-1.5 mt-4 opacity-80">
+                <li>Windows are rolling-hour, starting from your first request</li>
+                <li>Going over returns an error your AI can read and explain — no silent drop</li>
+                <li>Repeat lookups of the same domain hit the Postgres cache (sub-100ms) and burn nothing extra</li>
+                <li>Need higher limits? Open an issue on{" "}
+                  <a
+                    className="underline"
+                    style={{ color: "var(--accent)" }}
+                    href="https://github.com/adipundir/donadomains/issues"
+                  >
+                    GitHub
+                  </a>{" "}
+                  — we&apos;ll plan a self-service tier when there&apos;s demand.
+                </li>
+              </ul>
+            </Section>
+
+            {/* Examples */}
+            <Section id="examples" title="Examples">
+              <p className="opacity-80 mb-3">
+                Once installed, talk to your AI normally. It picks the right tool for you.
+              </p>
+              <TabbedCode
+                tabs={[
+                  {
+                    label: "Availability",
+                    code: `You: is ad402.sh available?
+AI:  (calls check_domain_availability)
+     ad402.sh is TAKEN — registered with Spaceship, Inc.,
+     expires 2027-03-18. Nameservers point to Cloudflare.`,
+                  },
+                  {
+                    label: "Brand search",
+                    code: `You: find me a cheap .io domain for a craft-beer brand
+AI:  (calls search_domains with keyword="craftbeer", tldFilter=".io")
+     5 available:
+       • craftbeer.io        $39.99 / yr at Namecheap
+       • mycraftbeer.io      $34.99 / yr at Porkbun
+       • craftbeerlab.io     $29.99 / yr at Dynadot
+       ...`,
+                  },
+                  {
+                    label: "Ownership",
+                    code: `You: who owns github.com and when does it expire?
+AI:  (calls get_domain_info with domain="github.com")
+     Registered with MarkMonitor Inc. since 2007-10-09.
+     Expires 2026-10-09 (renewed annually).
+     Nameservers: dns1.p08.nsone.net + 7 others (NS1 + AWS).
+     Status: clientDeleteProhibited, clientTransferProhibited,
+     clientUpdateProhibited.`,
+                  },
+                  {
+                    label: "Valuation",
+                    code: `You: what's crypto.com worth?
+AI:  (calls valuate_domain with domain="crypto.com")
+     ULTRA tier (score 96/100). Estimated value: $500M+.
+     Reasoning: A flagship .com matching a top-tier
+     commercial keyword. Single-word, dictionary, brandable,
+     sold publicly for $12M in 2018 and now central to a
+     multi-billion-dollar fintech ecosystem.`,
+                  },
+                ]}
+              />
+            </Section>
+
+            {/* Troubleshooting */}
+            <Section id="troubleshooting" title="Troubleshooting">
+              <p className="opacity-80 mb-3">Common issues and fixes:</p>
+
+              <div className="space-y-4">
+                <div
+                  className="rounded-lg p-4"
+                  style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}
+                >
+                  <p className="font-comic-title text-sm uppercase tracking-wide mb-1">
+                    My client doesn&apos;t accept a URL
+                  </p>
+                  <p className="opacity-80 text-sm">
+                    Older versions of some clients (pre-Streamable-HTTP) only support stdio.
+                    Use Option B (<code>npx -y donadomains-mcp</code>) instead. Or upgrade your
+                    client — every major MCP client added URL support in 2025.
+                  </p>
+                </div>
+
+                <div
+                  className="rounded-lg p-4"
+                  style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}
+                >
+                  <p className="font-comic-title text-sm uppercase tracking-wide mb-1">
+                    Tool calls return &quot;Rate limit exceeded&quot;
+                  </p>
+                  <p className="opacity-80 text-sm">
+                    You&apos;ve hit the per-IP cap (see Rate Limits above). Wait until the
+                    rolling-hour window resets, or come back from a different network. The
+                    error is surfaced as a normal tool result so the AI can explain it.
+                  </p>
+                </div>
+
+                <div
+                  className="rounded-lg p-4"
+                  style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}
+                >
+                  <p className="font-comic-title text-sm uppercase tracking-wide mb-1">
+                    I&apos;m on a corporate network and we share an IP
+                  </p>
+                  <p className="opacity-80 text-sm">
+                    Per-IP buckets mean a busy network shares its quota. If this affects you,
+                    please file an issue with your use case — we&apos;ll prioritize the
+                    self-service higher-limit tier.
+                  </p>
+                </div>
+
+                <div
+                  className="rounded-lg p-4"
+                  style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}
+                >
+                  <p className="font-comic-title text-sm uppercase tracking-wide mb-1">
+                    Search results seem slow
+                  </p>
+                  <p className="opacity-80 text-sm">
+                    <code>search_domains</code> scrapes 6 registrar sites in parallel — first call
+                    for a new keyword can take 5-15 seconds. Repeat searches and{" "}
+                    <code>get_domain_info</code> lookups are cached and return in &lt;100ms.
+                  </p>
+                </div>
+
+                <div
+                  className="rounded-lg p-4"
+                  style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}
+                >
+                  <p className="font-comic-title text-sm uppercase tracking-wide mb-1">
+                    Something else broken?
+                  </p>
+                  <p className="opacity-80 text-sm">
+                    Open an issue at{" "}
+                    <a
+                      className="underline"
+                      style={{ color: "var(--accent)" }}
+                      href="https://github.com/adipundir/donadomains/issues"
+                    >
+                      github.com/adipundir/donadomains
+                    </a>
+                    .
+                  </p>
+                </div>
+              </div>
+            </Section>
+
+            {/* Footer */}
+            <div
+              className="pt-8 mt-8 text-center font-comic-body text-sm opacity-50"
+              style={{ borderTop: "1px solid var(--border-light)" }}
+            >
+              Donadomains MCP · Built with{" "}
+              <a className="underline" href="https://modelcontextprotocol.io">
+                Model Context Protocol
+              </a>
+              .
+            </div>
+          </main>
         </div>
       </div>
     </div>

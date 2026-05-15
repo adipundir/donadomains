@@ -931,7 +931,7 @@ export default function Home() {
               className="font-comic-title text-xs sm:text-sm uppercase tracking-wide px-2.5 py-1 rounded transition-opacity hover:opacity-80"
               style={{ background: "var(--accent)", color: "#000" }}
             >
-              API Docs
+              MCP
             </a>
             <ThemeSwitcher />
           </div>

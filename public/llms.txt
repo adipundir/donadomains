@@ -1,77 +1,80 @@
-# Donadomains
+# Donadomains MCP
 
-> Domain search aggregator that compares prices across 6 registrars in real-time. Find the cheapest place to buy any domain, or look up who owns it.
+> Free MCP server giving AI agents real-time domain availability, multi-registrar price comparison, WHOIS/RDAP intel, and AI valuation. Works in Claude Desktop, Claude.ai web Connectors, Cursor, Continue, Windsurf, Zed.
 
-Base URL: https://donadomains.xyz
-OpenAPI spec: https://donadomains.xyz/openapi.json
-Full docs: https://donadomains.xyz/llms-full.txt
+Connect: https://donadomains.xyz/api/mcp
+Full docs: https://donadomains.xyz/docs
+Source: https://github.com/adipundir/donadomains
 
-## When to Use This API
+## Install
 
-Use Donadomains when users want to:
-- Find available domain names for a keyword, brand, or project
-- Compare domain registration prices to find the cheapest registrar
-- Check if a specific domain (e.g. "example.com") is available
-- Look up who owns a domain, when it expires, or what registrar holds it
-- Get nameservers, DNSSEC status, or RDAP data for a domain
+Two transports, both free, no API key needed.
 
-## Distribution Channels
+### Option A — URL (recommended)
 
-- HTTP API: see endpoints below
-- MCP server (URL): `https://donadomains.xyz/api/mcp` — Streamable HTTP transport, zero install, works in Claude Desktop ≥ 0.7, Claude.ai web Connectors, Cursor ≥ 0.41, Windsurf, Continue, Zed
-- MCP server (npx): `npx -y donadomains-mcp` — stdio transport, for clients without HTTP support
+For clients that support the Streamable HTTP transport (Claude Desktop ≥ 0.7, Claude.ai web Connectors, Cursor ≥ 0.41, Continue, Windsurf, Zed):
 
-## API — 3 Endpoints
+```json
+{
+  "mcpServers": {
+    "donadomains": {
+      "url": "https://donadomains.xyz/api/mcp"
+    }
+  }
+}
+```
 
-### 1. Domain Search — GET /api/search?q={keyword}
+### Option B — npx (stdio)
 
-Search for domain availability and compare prices across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun).
+For clients without HTTP transport support. Requires Node.js ≥ 18:
 
-Parameters:
-- q (required): Keyword like "startup" or full domain like "startup.io"
-- stream (optional): "true" for SSE streaming (results arrive as each registrar completes)
+```json
+{
+  "mcpServers": {
+    "donadomains": {
+      "command": "npx",
+      "args": ["-y", "donadomains-mcp"]
+    }
+  }
+}
+```
 
-Response: { keyword, tld, results: [DomainResult], sources: [{ name, status, count, durationMs, error? }] }
+## Tools
 
-Each DomainResult has:
-- domain: "startup.com"
-- available: true/false
-- buyLinks: [{ name: "GoDaddy", price: "$9.99/yr", priceNum: 9.99, url: "https://...", isCheapest: true }]
-- registerUrl: direct link to cheapest registrar
+### 1. check_domain_availability(domain)
 
-Tips:
-- Use the JSON mode (no stream param) for simple integrations
-- Filter results by available=true to get purchasable domains
-- Find cheapest via: buyLinks.find(l => l.isCheapest)
-- Takes 5-15 seconds (registrar scraping is the bottleneck)
+Check if a domain is available right now. If available, returns the lowest price and the registrar offering it. If taken, returns ownership info (registrar, dates, nameservers, status). Works for every TLD including .sh, .io, .ac via port-43 WHOIS fallback.
 
-### 2. Domain Info — GET /api/domain/{domain}
+### 2. search_domains(keyword, limit?, tldFilter?, includeTaken?)
 
-Detailed intelligence for a single domain. Layered pipeline: RDAP → port-43 WHOIS → DNS-over-HTTPS → who.is scrape fallback. Port-43 WHOIS covers RDAP-less ccTLDs like .sh, .io, .ac. Responses include X-Cache: HIT/MISS headers reflecting the Postgres-backed read-through cache.
+Search a keyword across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun). Returns available domains with prices, sorted by relevance, exact-match priority, registrar coverage, popular TLDs, and price.
 
-Response includes: registered, registrar, created, expires, nameservers, status, dnssec, registrant, organization, contactEmail, sources, timing, fetchedAt
+### 3. get_domain_info(domain)
 
-Tips:
-- Use this to check domain expiry dates (expires field)
-- registrant is often "REDACTED FOR PRIVACY" when privacy protection is on
-- Response time: ~50ms on cache hit, ~500ms–2s cold
+Deep WHOIS / RDAP / DNS intel for a registered domain — registrar, creation/expiry dates, nameservers, registrant (if not privacy-protected), DNSSEC, ICANN status codes. Postgres-cached, repeat lookups sub-100ms.
 
-### 3. Domain Valuation — GET /api/valuate/{domain}
+### 4. valuate_domain(domain, registered?, isPremium?, registrationPrice?)
 
-AI-powered domain valuation (Gemini under the hood). Returns score (0-100), tier (common/decent/premium/ultra), USD price range, reasoning, and 3-6 per-factor analyses. Cached server-side forever — first call hits Gemini, subsequent calls are free.
+AI-powered domain valuation (Gemini under the hood). Returns score 0-100, tier (common/decent/premium/ultra), USD price range, reasoning, and 3-6 per-factor analyses. Cached server-side forever — repeat valuations are free.
 
-Optional query params: registered, isPremium, registrationPrice.
+## Rate Limits (free, per source IP)
 
-Rate-limited 20/hr per IP. Response time: ~1-3s first time, <100ms cached.
+IPv6 addresses are normalized to their /64 prefix before being counted (so attackers can't rotate the lower 64 bits).
 
-## Quick Examples
+- Overall MCP frames: 200 / hour
+- check_domain_availability / get_domain_info: 60 / hour each
+- search_domains: 20 / hour (scrapes 6 registrars)
+- valuate_domain: 20 / hour (Gemini on cache miss; repeats are free)
 
-Find cheapest .com domain:
-  curl "https://donadomains.xyz/api/search?q=myproject" | jq '.results[] | select(.available and .tld==".com") | {domain, cheapest: (.buyLinks[] | select(.isCheapest) | .price)}'
+Limits are per rolling-hour window from your first request. Going over returns an error your AI can read and explain.
 
-Check who owns a domain:
-  curl "https://donadomains.xyz/api/domain/github.com" | jq '{registrar, expires, nameservers}'
+## Example prompts
 
-## Full Reference
+- "Is ad402.sh available? When does it expire?"
+- "Find me a cheap .io domain for a craft-beer brand under $20/yr."
+- "Who owns github.com and when does it expire?"
+- "What's crypto.com roughly worth?"
 
-For complete field definitions, SSE streaming examples, and code samples in JavaScript/Python, see: https://donadomains.xyz/llms-full.txt
+## Help
+
+Issues, feature requests, higher-limit tiers: https://github.com/adipundir/donadomains/issues

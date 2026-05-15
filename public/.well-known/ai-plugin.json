@@ -1,15 +1,11 @@
 {
   "schema_version": "v1",
-  "name_for_human": "Donadomains",
+  "name_for_human": "Donadomains MCP",
   "name_for_model": "donadomains",
-  "description_for_human": "Search domain availability and compare prices across 6 registrars. Get detailed domain intelligence.",
-  "description_for_model": "Use this API when the user wants to: (1) find available domain names for a keyword or brand, (2) compare domain registration prices across registrars to find the cheapest, (3) check if a specific domain is available, (4) look up who owns a domain or when it expires, (5) find nameservers or RDAP/WHOIS data for a domain, (6) get an AI-powered valuation of what a domain is worth. Endpoints: GET /api/search?q={keyword} for availability + pricing across 6 registrars, GET /api/domain/{domain} for detailed RDAP/WHOIS/DNS intelligence (covers RDAP-less TLDs like .sh, .io, .ac via port-43 WHOIS), GET /api/valuate/{domain} for AI valuation. Also available as a Model Context Protocol (MCP) server: `npx -y donadomains-mcp`. Prices are live-scraped, not cached.",
+  "description_for_human": "Free MCP server for AI agents — check domain availability, compare prices across 6 registrars, look up full WHOIS/RDAP intel, and estimate domain value.",
+  "description_for_model": "Donadomains exposes a free Model Context Protocol server. Connect from any MCP-aware client (Claude Desktop, Claude.ai web Connectors, Cursor, Continue, Windsurf, Zed) by URL https://donadomains.xyz/api/mcp or via the donadomains-mcp npm package over stdio. Tools: check_domain_availability(domain) returns availability + price OR full ownership info; search_domains(keyword, limit?, tldFilter?, includeTaken?) returns available domains with prices across GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun; get_domain_info(domain) returns WHOIS/RDAP/DNS intel for any TLD including RDAP-less ccTLDs like .sh, .io, .ac via port-43 WHOIS; valuate_domain(domain, registered?, isPremium?, registrationPrice?) returns AI-powered USD valuation with reasoning. Free, no API key, rate-limited per IP (IPv6 normalized to /64).",
   "auth": {
     "type": "none"
-  },
-  "api": {
-    "type": "openapi",
-    "url": "https://donadomains.xyz/openapi.json"
   },
   "logo_url": "https://donadomains.xyz/globe.svg",
   "contact_email": "aditya@donalabs.xyz",
