@@ -1,43 +1,26 @@
 # Donadomains MCP
 
-> Free MCP server giving AI agents real-time domain availability, multi-registrar price comparison, WHOIS/RDAP intel, and AI valuation. Works in Claude Desktop, Claude.ai web Connectors, Cursor, Continue, Windsurf, Zed.
+> Free MCP server giving AI agents real-time domain availability, multi-registrar price comparison, WHOIS/RDAP intel, and AI valuation. Works in any MCP client that supports the Streamable HTTP transport.
 
-Connect: https://donadomains.xyz/api/mcp
-Full docs: https://donadomains.xyz/docs
+Connect: https://www.donadomains.xyz/api/mcp
+Full docs: https://www.donadomains.xyz/docs
 Source: https://github.com/adipundir/donadomains
 
 ## Install
 
-Two transports, both free, no API key needed.
-
-### Option A — URL (recommended)
-
-For clients that support the Streamable HTTP transport (Claude Desktop ≥ 0.7, Claude.ai web Connectors, Cursor ≥ 0.41, Continue, Windsurf, Zed):
+Add this to your MCP client's server config:
 
 ```json
 {
   "mcpServers": {
     "donadomains": {
-      "url": "https://donadomains.xyz/api/mcp"
+      "url": "https://www.donadomains.xyz/api/mcp"
     }
   }
 }
 ```
 
-### Option B — npx (stdio)
-
-For clients without HTTP transport support. Requires Node.js ≥ 18:
-
-```json
-{
-  "mcpServers": {
-    "donadomains": {
-      "command": "npx",
-      "args": ["-y", "donadomains-mcp"]
-    }
-  }
-}
-```
+No signup, no API key. Compatible with any client supporting the Streamable HTTP transport — Claude Desktop, Claude.ai web Connectors, Cursor, Continue, Windsurf, Zed.
 
 ## Tools
 

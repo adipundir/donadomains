@@ -58,16 +58,7 @@ const NAV_ITEMS = [
 const CONFIG_URL = `{
   "mcpServers": {
     "donadomains": {
-      "url": "https://donadomains.xyz/api/mcp"
-    }
-  }
-}`;
-
-const CONFIG_NPX = `{
-  "mcpServers": {
-    "donadomains": {
-      "command": "npx",
-      "args": ["-y", "donadomains-mcp"]
+      "url": "https://www.donadomains.xyz/api/mcp"
     }
   }
 }`;
@@ -117,8 +108,8 @@ export default function DocsPage() {
               <p className="font-comic-body text-base opacity-80 max-w-2xl mb-3">
                 Give your AI agent real-time domain superpowers. Check availability, compare prices
                 across 6 registrars, look up WHOIS/RDAP intel for any TLD (including <code>.sh</code>,
-                <code> .io</code>, <code>.ac</code>), and estimate domain value — all from inside
-                Claude Desktop, Cursor, Continue, Windsurf, Zed, or Claude.ai.
+                <code> .io</code>, <code>.ac</code>), and estimate domain value — from any MCP
+                client that supports the Streamable HTTP transport.
               </p>
               <p className="font-comic-body text-sm opacity-60">
                 Free. No signup. No API key. Connect by URL.
@@ -143,47 +134,27 @@ export default function DocsPage() {
             {/* Install */}
             <Section id="install" title="Install">
               <p className="opacity-80">
-                Two ways to connect. Pick whichever your client supports — both are free, neither needs
-                an account.
+                Add this block to your MCP client&apos;s server config. No signup, no API key, free.
               </p>
 
               <div className="mt-4">
-                <p className="font-comic-title text-sm uppercase tracking-wide mb-2">
-                  Option A — URL <span className="opacity-60">(recommended)</span>
-                </p>
-                <p className="opacity-70 text-sm mb-3">
-                  For clients that speak the <strong>Streamable HTTP</strong> transport:
-                  Claude Desktop ≥ 0.7, Claude.ai web Connectors, Cursor ≥ 0.41, Windsurf,
-                  Continue, Zed. Zero install. Instant updates. No Node.js required.
-                </p>
                 <CodeBlock title="config">{CONFIG_URL}</CodeBlock>
-
-                <p className="opacity-70 text-sm mt-4">
-                  Or in Claude.ai web: Settings → <em>Connectors</em> → <em>Add custom</em> →
-                  paste <code>https://donadomains.xyz/api/mcp</code>.
-                </p>
               </div>
 
-              <div className="mt-8">
-                <p className="font-comic-title text-sm uppercase tracking-wide mb-2">
-                  Option B — npx (stdio fallback)
-                </p>
-                <p className="opacity-70 text-sm mb-3">
-                  For clients that only support stdio transport. Requires Node.js ≥ 18.
-                </p>
-                <CodeBlock title="config">{CONFIG_NPX}</CodeBlock>
-              </div>
+              <p className="opacity-70 text-sm mt-4">
+                The endpoint speaks the <strong>Streamable HTTP</strong> transport — supported by
+                any current MCP client (Claude Desktop, Claude.ai Connectors, Cursor, Continue,
+                Windsurf, Zed). If your client only supports stdio and won&apos;t accept a URL, it
+                cannot connect today.
+              </p>
 
               <p className="opacity-60 text-sm mt-4">
-                Per-client config-file locations are in the{" "}
-                <a
-                  className="underline"
-                  style={{ color: "var(--accent)" }}
-                  href="https://github.com/adipundir/donadomains/tree/main/mcp"
-                >
-                  mcp/README
-                </a>
-                .
+                Where the config file lives depends on your client. Common locations:
+                <br />
+                <code>~/Library/Application Support/Claude/claude_desktop_config.json</code> (macOS,
+                Claude Desktop),{" "}
+                <code>%APPDATA%\Claude\claude_desktop_config.json</code> (Windows).
+                Cursor: Settings → MCP. Claude.ai web: Settings → Connectors → Add custom.
               </p>
             </Section>
 
@@ -406,9 +377,18 @@ AI:  (calls valuate_domain with domain="crypto.com")
                     My client doesn&apos;t accept a URL
                   </p>
                   <p className="opacity-80 text-sm">
-                    Older versions of some clients (pre-Streamable-HTTP) only support stdio.
-                    Use Option B (<code>npx -y donadomains-mcp</code>) instead. Or upgrade your
-                    client — every major MCP client added URL support in 2025.
+                    Donadomains MCP is HTTP-only today. If your MCP client is stdio-only, please
+                    upgrade it — current versions of Claude Desktop, Cursor, Continue, Windsurf,
+                    and Zed all support the Streamable HTTP transport. A stdio-transport package
+                    is on the roadmap; track progress on{" "}
+                    <a
+                      className="underline"
+                      style={{ color: "var(--accent)" }}
+                      href="https://github.com/adipundir/donadomains/issues"
+                    >
+                      GitHub issues
+                    </a>
+                    .
                   </p>
                 </div>
 

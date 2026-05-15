@@ -1,11 +1,10 @@
 /**
  * In-app MCP tool handlers — call internal libs directly (no HTTP self-hop).
  *
- * Differs from the npm package's handlers (`mcp/src/tools/*`) which call
- * https://donadomains.xyz over HTTPS — that version is for users running
- * the server locally via `npx donadomains-mcp`. This in-app version powers
- * `/api/mcp` and benefits from zero network overhead between the route
- * handler and the data pipeline.
+ * The canonical implementation powering `/api/mcp`. A sibling implementation
+ * in `mcp/src/tools/*` makes HTTP calls back to donadomains.xyz; that code
+ * is the source for a future stdio-transport package that is not yet
+ * published to npm.
  */
 
 import { fetchDomainIntel, fetchDomainIntelWithMeta } from "../domain-intel";

@@ -1,207 +1,42 @@
-# donadomains-mcp
+# mcp/
 
-> MCP server for [Donadomains](https://donadomains.xyz) — gives your AI agent real-time domain availability, multi-registrar price comparison, WHOIS/RDAP intelligence, and AI valuation.
+This directory holds **source for a future stdio-transport package**. It is **not yet published to npm** — do not advertise `npx donadomains-mcp` until it is.
 
-Use it from Claude Desktop, Cursor, Continue, Windsurf, Zed, or anywhere that speaks [Model Context Protocol](https://modelcontextprotocol.io).
+## Today's recommended integration
 
-```text
-You: "is ad402.sh available?"
-AI:  (calls check_domain_availability)
-     ad402.sh is TAKEN — registered with Spaceship, Inc., expires 2027-03-18.
-```
-
-## Install
-
-Two transport options. **Pick whichever your client supports.**
-
-### Option A — URL (recommended)
-
-If your MCP client supports the **Streamable HTTP transport** (Claude Desktop ≥ 0.7, Claude.ai web Connectors, Cursor ≥ 0.41, Windsurf, Continue, Zed) just point it at our hosted URL — nothing to install, nothing to update, no Node.js required.
+Donadomains ships as an MCP server over **Streamable HTTP**. Connect by URL:
 
 ```json
 {
   "mcpServers": {
     "donadomains": {
-      "url": "https://donadomains.xyz/api/mcp"
+      "url": "https://www.donadomains.xyz/api/mcp"
     }
   }
 }
 ```
 
-Or in Claude.ai web: Connectors → Add custom → paste `https://donadomains.xyz/api/mcp`.
+Full docs: <https://www.donadomains.xyz/docs>
 
-### Option B — npx (stdio, for older clients)
+The HTTP endpoint and the source in this directory share the same four tools (`check_domain_availability`, `search_domains`, `get_domain_info`, `valuate_domain`), but the canonical implementation lives at `app/api/mcp/route.ts` and `app/lib/mcp-tools/`. The code in `src/` here is a thin HTTP-client wrapper that we'll publish once stdio-only MCP clients become a meaningful audience.
 
-If your client only supports stdio transport, use the npm package below. Requires Node.js ≥ 18.
-
-### Claude Desktop
-
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
-
-```json
-{
-  "mcpServers": {
-    "donadomains": {
-      "command": "npx",
-      "args": ["-y", "donadomains-mcp"]
-    }
-  }
-}
-```
-
-Restart Claude. The four tools should appear in the tools menu.
-
-### Cursor
-
-Settings → MCP → "Add new MCP server":
-
-```json
-{
-  "donadomains": {
-    "command": "npx",
-    "args": ["-y", "donadomains-mcp"]
-  }
-}
-```
-
-### Continue (VS Code / JetBrains)
-
-In `~/.continue/config.json` under `experimental.modelContextProtocolServers`:
-
-```json
-{
-  "experimental": {
-    "modelContextProtocolServers": [
-      {
-        "transport": {
-          "type": "stdio",
-          "command": "npx",
-          "args": ["-y", "donadomains-mcp"]
-        }
-      }
-    ]
-  }
-}
-```
-
-### Windsurf
-
-Settings → Cascade → Model Context Protocol → "Add MCP Server":
-
-```json
-{
-  "donadomains": {
-    "command": "npx",
-    "args": ["-y", "donadomains-mcp"]
-  }
-}
-```
-
-### Zed
-
-In `~/.config/zed/settings.json`:
-
-```json
-{
-  "context_servers": {
-    "donadomains": {
-      "command": {
-        "path": "npx",
-        "args": ["-y", "donadomains-mcp"]
-      }
-    }
-  }
-}
-```
-
-### Any other MCP client
-
-Same idea — the binary is `npx -y donadomains-mcp` and the transport is `stdio`.
-
-## Tools
-
-### `check_domain_availability`
-
-Check if a specific domain is available right now. Returns availability + best price + buy URL if available, or full ownership info (registrar, expiry, nameservers) if taken. Works for every TLD including RDAP-less ones like `.sh`, `.io`, `.ac` via port-43 WHOIS fallback.
-
-```json
-{ "domain": "example.com" }
-```
-
-### `search_domains`
-
-Search a keyword across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun). Returns available domains with prices, sorted by relevance and price.
-
-```json
-{ "keyword": "myproject", "limit": 20, "tldFilter": ".com" }
-```
-
-### `get_domain_info`
-
-Deep WHOIS/RDAP intel for a registered domain — registrar, dates, nameservers, status codes, DNSSEC, registrant if not privacy-protected.
-
-```json
-{ "domain": "github.com" }
-```
-
-### `valuate_domain`
-
-Gemini-powered domain valuation. Returns score, tier (common/decent/premium/ultra), estimated USD range, reasoning, and per-factor breakdown. Cached server-side, so repeat valuations are free.
-
-```json
-{ "domain": "crypto.com" }
-```
-
-## Configuration
-
-| Env var | Default | Purpose |
-|---|---|---|
-| `DONADOMAINS_BASE_URL` | `https://donadomains.xyz` | Override the API host (useful for staging or local dev against `http://localhost:3000`). Only relevant for Option B (npx). |
-
-## Rate limits
-
-Rate-limited per source IP. IPv6 addresses are normalized to /64 prefixes — an attacker can't trivially rotate the lower 64 bits to bypass limits.
-
-### Option A (URL transport)
-
-| Bucket | Limit |
-|---|---|
-| Overall MCP frames | 200 req/hr |
-| `check_domain_availability` | 60 req/hr (shares the `domain` bucket) |
-| `get_domain_info` | 60 req/hr (shares the `domain` bucket) |
-| `search_domains` | 20 req/hr |
-| `valuate_domain` | 20 req/hr |
-
-### Option B (npx transport)
-
-The stdio server calls the same public API and shares the same per-IP buckets above.
-
-If you hit a limit, the tool returns a JSON-RPC error or an `isError: true` content block — the LLM can read it and explain to the user.
-
-## Development
+## Build (for local development / testing)
 
 ```bash
-git clone https://github.com/adipundir/donadomains
-cd donadomains/mcp
 npm install
 npm run build
-npm run inspect   # opens the MCP Inspector for live testing
+npm run inspect   # MCP Inspector against the built bundle
 ```
 
-Or from the repo root:
+Or from the repo root: `make build-mcp` / `make test-mcp`.
+
+When run, the binary makes HTTPS calls to `DONADOMAINS_BASE_URL` (default `https://www.donadomains.xyz`).
+
+## Publish (when ready)
 
 ```bash
-make install
-make build-mcp
-make dev-mcp
+cd mcp
+npm publish --access public
 ```
 
-To point the MCP at a local Next.js dev server (`npm run dev` in the repo root, listening on `:3000`):
-
-```bash
-DONADOMAINS_BASE_URL=http://localhost:3000 node mcp/dist/index.js
-```
-
-## License
-
-MIT
+Before publishing: bump `version` in `package.json`, run `npm publish --dry-run`, and update the public docs (`app/docs/page.tsx`, `README.md`, `public/llms.txt`, `public/llms-full.txt`) to advertise the npx install path alongside the URL one.

@@ -2,36 +2,29 @@
 
 **Real-time domain superpowers for your AI agent — availability, prices across 6 registrars, full WHOIS/RDAP intel, and AI valuation. Free, no signup, no API key.**
 
-Live at [donadomains.xyz](https://donadomains.xyz) · [MCP Docs](https://donadomains.xyz/docs) · Product of [Donalabs](https://donalabs.com)
+Live at [donadomains.xyz](https://donadomains.xyz) · [MCP Docs](https://www.donadomains.xyz/docs) · Product of [Donalabs](https://donalabs.com)
 
-## Install (pick whichever your client supports)
+## Install
 
-**Option A — URL** (recommended; works in Claude Desktop ≥ 0.7, Claude.ai web Connectors, Cursor ≥ 0.41, Windsurf, Continue, Zed):
-
-```json
-{
-  "mcpServers": {
-    "donadomains": {
-      "url": "https://donadomains.xyz/api/mcp"
-    }
-  }
-}
-```
-
-**Option B — npx** (stdio fallback; requires Node.js ≥ 18):
+Add this to your MCP client's server config:
 
 ```json
 {
   "mcpServers": {
     "donadomains": {
-      "command": "npx",
-      "args": ["-y", "donadomains-mcp"]
+      "url": "https://www.donadomains.xyz/api/mcp"
     }
   }
 }
 ```
 
-Per-client config locations (Claude Desktop, Cursor, Continue, Windsurf, Zed) are in [`mcp/README.md`](./mcp/README.md).
+That's it — no install, no signup, no API key. Works in any MCP client that supports the **Streamable HTTP transport** (Claude Desktop, Claude.ai Connectors, Cursor, Continue, Windsurf, Zed).
+
+Common config-file locations:
+- **Claude Desktop (macOS)**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Claude Desktop (Windows)**: `%APPDATA%\Claude\claude_desktop_config.json`
+- **Cursor**: Settings → MCP
+- **Claude.ai web**: Settings → Connectors → Add custom
 
 ## What your AI can do
 
@@ -67,7 +60,7 @@ Postgres-backed read-through cache with adaptive TTLs keeps repeat lookups sub-1
 ## Tech stack
 
 - **Next.js 16** (App Router), React, TypeScript, Tailwind CSS — hosted on Vercel
-- **Model Context Protocol** (`@modelcontextprotocol/sdk`) — Streamable HTTP at `/api/mcp` + stdio via `donadomains-mcp` on npm
+- **Model Context Protocol** (`@modelcontextprotocol/sdk`) — Streamable HTTP at `/api/mcp`
 - **Firecrawl** for JS-heavy registrar page scraping
 - **RDAP** + **port-43 WHOIS** + **DNS-over-HTTPS** for layered intelligence
 - **Neon Postgres** + **Drizzle ORM** for the intel cache, rate limits, and watch system
@@ -79,12 +72,12 @@ Postgres-backed read-through cache with adaptive TTLs keeps repeat lookups sub-1
 
 ```
 .
-├── app/                ← Next.js app (web search UI + MCP HTTP route + REST handlers)
+├── app/                ← Next.js app (web search UI + MCP HTTP route)
 │   ├── api/mcp/        ← Streamable HTTP MCP endpoint
 │   ├── lib/whois/      ← Port-43 WHOIS client + IANA discovery + parser
 │   ├── lib/mcp-tools/  ← In-app MCP tool handlers
 │   └── lib/intel-cache.ts
-├── mcp/                ← donadomains-mcp npm package (stdio fallback)
+├── mcp/                ← Source for a future stdio-transport package (not yet published)
 ├── drizzle/            ← Migrations
 └── Makefile            ← install / build / test / publish / clean
 ```

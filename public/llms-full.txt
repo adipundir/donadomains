@@ -2,48 +2,36 @@
 
 > Free Model Context Protocol server. Gives any MCP-aware AI client (Claude Desktop, Claude.ai web Connectors, Cursor, Continue, Windsurf, Zed) real-time domain superpowers: availability, prices across 6 registrars, full WHOIS/RDAP intel, and AI valuation.
 
-Connect URL: https://donadomains.xyz/api/mcp
-Web docs: https://donadomains.xyz/docs
+Connect URL: https://www.donadomains.xyz/api/mcp
+Web docs: https://www.donadomains.xyz/docs
 Source: https://github.com/adipundir/donadomains
 
 Auth: None. No signup, no API key. Rate-limited per IP (see below).
+Transport: Streamable HTTP only.
 
 ---
 
 ## Install
 
-### Option A — URL (recommended)
-
-For clients that support the Streamable HTTP transport. One block to add to your MCP client config:
+Add this block to your MCP client's server config:
 
 ```json
 {
   "mcpServers": {
     "donadomains": {
-      "url": "https://donadomains.xyz/api/mcp"
+      "url": "https://www.donadomains.xyz/api/mcp"
     }
   }
 }
 ```
 
-Claude.ai web users: Settings → Connectors → Add custom → paste `https://donadomains.xyz/api/mcp`.
+Common config-file locations:
+- Claude Desktop (macOS): `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Claude Desktop (Windows): `%APPDATA%\Claude\claude_desktop_config.json`
+- Cursor: Settings → MCP
+- Claude.ai web: Settings → Connectors → Add custom
 
-### Option B — npx (stdio)
-
-For clients that only support stdio transport. Requires Node.js ≥ 18.
-
-```json
-{
-  "mcpServers": {
-    "donadomains": {
-      "command": "npx",
-      "args": ["-y", "donadomains-mcp"]
-    }
-  }
-}
-```
-
-Per-client config-file locations (Claude Desktop, Cursor, Continue, Windsurf, Zed) are documented in https://github.com/adipundir/donadomains/tree/main/mcp.
+The endpoint speaks the Streamable HTTP transport. Any current MCP client supports it. If your client only supports stdio, it cannot connect today.
 
 ---
 
@@ -206,15 +194,14 @@ When `search_domains` is called, all 6 registrar search pages are scraped in par
 
 ## Troubleshooting
 
-- **My client doesn't accept a URL** — use Option B (npx) until you upgrade your client.
 - **Rate limit exceeded** — wait for the rolling-hour window to reset, or reduce call frequency.
 - **Slow first search** — `search_domains` cold takes 5-15s (parallel scraping). Cached subsequent reads are fast.
 - **Higher limits needed** — open an issue: https://github.com/adipundir/donadomains/issues.
+- **Client doesn't accept a URL** — upgrade to a current version that supports the Streamable HTTP transport. A stdio-transport package is on the roadmap but not yet shipped.
 
 ---
 
 ## Source
 
 Repo: https://github.com/adipundir/donadomains
-npm: https://www.npmjs.com/package/donadomains-mcp
 License: MIT
