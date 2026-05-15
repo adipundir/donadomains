@@ -12,7 +12,27 @@ AI:  (calls check_domain_availability)
 
 ## Install
 
-No download, no API key, no setup. Add the server block below to your MCP client config and it'll install on first use via `npx`.
+Two transport options. **Pick whichever your client supports.**
+
+### Option A — URL (recommended)
+
+If your MCP client supports the **Streamable HTTP transport** (Claude Desktop ≥ 0.7, Claude.ai web Connectors, Cursor ≥ 0.41, Windsurf, Continue, Zed) just point it at our hosted URL — nothing to install, nothing to update, no Node.js required.
+
+```json
+{
+  "mcpServers": {
+    "donadomains": {
+      "url": "https://donadomains.xyz/api/mcp"
+    }
+  }
+}
+```
+
+Or in Claude.ai web: Connectors → Add custom → paste `https://donadomains.xyz/api/mcp`.
+
+### Option B — npx (stdio, for older clients)
+
+If your client only supports stdio transport, use the npm package below. Requires Node.js ≥ 18.
 
 ### Claude Desktop
 
@@ -136,19 +156,27 @@ Gemini-powered domain valuation. Returns score, tier (common/decent/premium/ultr
 
 | Env var | Default | Purpose |
 |---|---|---|
-| `DONADOMAINS_BASE_URL` | `https://donadomains.xyz` | Override the API host (useful for staging or local dev against `http://localhost:3000`). |
+| `DONADOMAINS_BASE_URL` | `https://donadomains.xyz` | Override the API host (useful for staging or local dev against `http://localhost:3000`). Only relevant for Option B (npx). |
 
 ## Rate limits
 
-The MCP server hits the public Donadomains API which is rate-limited per source IP:
+Rate-limited per source IP. IPv6 addresses are normalized to /64 prefixes — an attacker can't trivially rotate the lower 64 bits to bypass limits.
 
-| Endpoint | Limit |
+### Option A (URL transport)
+
+| Bucket | Limit |
 |---|---|
-| `/api/search` | 20 req/hr |
-| `/api/domain/{domain}` | 60 req/hr |
-| `/api/valuate/{domain}` | 20 req/hr |
+| Overall MCP frames | 200 req/hr |
+| `check_domain_availability` | 60 req/hr (shares the `domain` bucket) |
+| `get_domain_info` | 60 req/hr (shares the `domain` bucket) |
+| `search_domains` | 20 req/hr |
+| `valuate_domain` | 20 req/hr |
 
-These are generous for interactive AI use. If you hit them, the tool returns a `429 Rate limit exceeded` error.
+### Option B (npx transport)
+
+The stdio server calls the same public API and shares the same per-IP buckets above.
+
+If you hit a limit, the tool returns a JSON-RPC error or an `isError: true` content block — the LLM can read it and explain to the user.
 
 ## Development
 

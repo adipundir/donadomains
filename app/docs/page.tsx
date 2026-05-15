@@ -232,8 +232,8 @@ export default function DocsPage() {
               >
                 <Badge>MCP</Badge>
                 <div>
-                  <code className="text-sm font-bold">npx -y donadomains-mcp</code>
-                  <p className="font-comic-body text-sm opacity-70 mt-0.5">MCP server for Claude Desktop, Cursor, Continue, Windsurf, Zed — drop-in AI agent access.</p>
+                  <code className="text-sm font-bold">https://donadomains.xyz/api/mcp</code>
+                  <p className="font-comic-body text-sm opacity-70 mt-0.5">Hosted MCP server for Claude Desktop, Cursor, Continue, Windsurf, Zed, Claude.ai — connect by URL, no install.</p>
                 </div>
               </a>
             </div>
@@ -567,7 +567,24 @@ print(intel["sources"])      # ["rdap", "dns"]` },
           </Section>
 
           <Section id="mcp-install" title="MCP Install">
-            <p className="opacity-80 mb-3">Add this single block to your MCP client config. No env vars, no API keys.</p>
+            <p className="opacity-80 mb-3">Two transports. Pick whichever your client supports — both are zero-config.</p>
+
+            <p className="font-comic-title text-sm uppercase tracking-wide mt-4 mb-2">Option A — URL <span className="opacity-60">(recommended)</span></p>
+            <p className="opacity-70 text-sm mb-2">
+              For clients that speak Streamable HTTP transport: Claude Desktop ≥ 0.7, Claude.ai web Connectors, Cursor ≥ 0.41, Windsurf, Continue, Zed. Zero install, instant updates, no Node.js required.
+            </p>
+            <CodeBlock title="config">{`{
+  "mcpServers": {
+    "donadomains": {
+      "url": "https://donadomains.xyz/api/mcp"
+    }
+  }
+}`}</CodeBlock>
+
+            <p className="font-comic-title text-sm uppercase tracking-wide mt-6 mb-2">Option B — npx (stdio)</p>
+            <p className="opacity-70 text-sm mb-2">
+              For clients that only support stdio transport. Requires Node.js ≥ 18.
+            </p>
             <CodeBlock title="claude_desktop_config.json / cursor / windsurf">{`{
   "mcpServers": {
     "donadomains": {
@@ -603,7 +620,11 @@ print(intel["sources"])      # ["rdap", "dns"]` },
                 <FieldRow name="/api/search" type="20 req/hr" desc="Each search scrapes 6 registrars — expensive upstream" />
                 <FieldRow name="/api/domain/{domain}" type="60 req/hr" desc="Lightweight RDAP + WHOIS + DNS lookups (read-through cached)" />
                 <FieldRow name="/api/valuate/{domain}" type="20 req/hr" desc="Gemini calls cost money — first call uncached, repeat calls free" />
+                <FieldRow name="/api/mcp (overall)" type="200 req/hr" desc="MCP JSON-RPC frames; per-tool calls also count toward the bucket of the underlying endpoint" />
               </div>
+              <p className="opacity-70 text-sm mb-3">
+                IPv6 addresses are normalized to their /64 prefix before being used as the rate-limit key.
+              </p>
               <ul className="list-disc list-inside space-y-1.5 opacity-80">
                 <li>Rate limits reset every hour from your first request</li>
                 <li>Exceeding the limit returns <strong>429 Too Many Requests</strong></li>

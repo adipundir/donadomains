@@ -18,7 +18,8 @@ Use Donadomains when users want to:
 ## Distribution Channels
 
 - HTTP API: see endpoints below
-- MCP server: `npx -y donadomains-mcp` (stdio transport, works in Claude Desktop / Cursor / Continue / Windsurf / Zed)
+- MCP server (URL): `https://donadomains.xyz/api/mcp` — Streamable HTTP transport, zero install, works in Claude Desktop ≥ 0.7, Claude.ai web Connectors, Cursor ≥ 0.41, Windsurf, Continue, Zed
+- MCP server (npx): `npx -y donadomains-mcp` — stdio transport, for clients without HTTP support
 
 ## API — 3 Endpoints
 

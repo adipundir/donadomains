@@ -34,9 +34,21 @@ curl "https://donadomains.xyz/api/valuate/crypto.com"
 
 ### MCP Server (for AI agents)
 
-Use Donadomains directly from Claude Desktop, Cursor, Continue, Windsurf, Zed, or any MCP-aware client. Add this to your config:
+Use Donadomains directly from Claude Desktop, Cursor, Continue, Windsurf, Zed, Claude.ai web Connectors, or any MCP-aware client. Two transports — pick whichever your client supports:
 
 ```json
+// Recommended — hosted, zero-install
+{
+  "mcpServers": {
+    "donadomains": {
+      "url": "https://donadomains.xyz/api/mcp"
+    }
+  }
+}
+```
+
+```json
+// Fallback — stdio via npx (for clients without HTTP transport)
 {
   "mcpServers": {
     "donadomains": {

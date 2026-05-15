@@ -4,8 +4,8 @@
 
 Base URL: https://donadomains.xyz
 Docs: https://donadomains.xyz/docs
-Auth: None — open API rate-limited per IP.
-MCP: For AI clients (Claude Desktop, Cursor, Continue, Windsurf, Zed) install via `npx -y donadomains-mcp`.
+Auth: None — open API rate-limited per IP (IPv6 normalized to /64).
+MCP: For AI clients (Claude Desktop, Claude.ai web, Cursor, Continue, Windsurf, Zed) connect by URL to https://donadomains.xyz/api/mcp, or fall back to `npx -y donadomains-mcp` for stdio-only clients.
 
 ---
 
@@ -280,7 +280,10 @@ curl "https://donadomains.xyz/api/valuate/crypto.com"
 
 ## MCP Server for AI Clients
 
-`donadomains-mcp` is a Model Context Protocol server distributed on npm. Lets any MCP-aware AI client (Claude Desktop, Cursor, Continue, Windsurf, Zed) call the Donadomains pipeline directly.
+Donadomains ships an MCP server in two transports:
+
+- **URL (recommended)**: `https://donadomains.xyz/api/mcp` — Streamable HTTP, zero install, instant updates
+- **npx**: `npx -y donadomains-mcp` — stdio, for older clients without HTTP support
 
 ### Tools Exposed
 
@@ -289,9 +292,19 @@ curl "https://donadomains.xyz/api/valuate/crypto.com"
 - `get_domain_info(domain)` — WHOIS / RDAP / DNS intel
 - `valuate_domain(domain, registered?, isPremium?, registrationPrice?)` — AI valuation
 
-### Install
+### Install (URL)
 
-Add this to any MCP client config (example: Claude Desktop `claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "donadomains": {
+      "url": "https://donadomains.xyz/api/mcp"
+    }
+  }
+}
+```
+
+### Install (npx)
 
 ```json
 {
