@@ -1,6 +1,6 @@
 # Donadomains MCP
 
-> Free MCP server giving AI agents real-time domain availability, multi-registrar price comparison, WHOIS/RDAP intel, and AI valuation. Works in any MCP client that supports the Streamable HTTP transport.
+> Free MCP server. Domain search, WHOIS, and AI valuation for AI agents.
 
 Connect: https://www.donadomains.xyz/api/mcp
 Full docs: https://www.donadomains.xyz/docs
@@ -8,56 +8,63 @@ Source: https://github.com/adipundir/donadomains
 
 ## Install
 
-Add this to your MCP client's server config:
+Claude Code CLI:
+
+```bash
+claude mcp add --transport http donadomains https://www.donadomains.xyz/api/mcp
+```
+
+Any other MCP client (Claude Desktop, Claude.ai Connectors, Cursor, Continue, Windsurf, Zed):
 
 ```json
 {
   "mcpServers": {
     "donadomains": {
+      "type": "http",
       "url": "https://www.donadomains.xyz/api/mcp"
     }
   }
 }
 ```
 
-No signup, no API key. Compatible with any client supporting the Streamable HTTP transport — Claude Desktop, Claude.ai web Connectors, Cursor, Continue, Windsurf, Zed.
+No signup, no API key.
 
 ## Tools
 
 ### 1. check_domain_availability(domain)
 
-Check if a domain is available right now. If available, returns the lowest price and the registrar offering it. If taken, returns ownership info (registrar, dates, nameservers, status). Works for every TLD including .sh, .io, .ac via port-43 WHOIS fallback.
+Is a domain free right now? If available, returns the lowest price and which registrar. If taken, returns ownership info (registrar, dates, nameservers, status).
 
 ### 2. search_domains(keyword, limit?, tldFilter?, includeTaken?)
 
-Search a keyword across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun). Returns available domains with prices, sorted by relevance, exact-match priority, registrar coverage, popular TLDs, and price.
+Search a keyword across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun). Returns available domains with prices.
 
 ### 3. get_domain_info(domain)
 
-Deep WHOIS / RDAP / DNS intel for a registered domain — registrar, creation/expiry dates, nameservers, registrant (if not privacy-protected), DNSSEC, ICANN status codes. Postgres-cached, repeat lookups sub-100ms.
+WHOIS, RDAP, DNS intel for a registered domain. Registrar, dates, nameservers, status codes, DNSSEC.
 
 ### 4. valuate_domain(domain, registered?, isPremium?, registrationPrice?)
 
-AI-powered domain valuation (Gemini under the hood). Returns score 0-100, tier (common/decent/premium/ultra), USD price range, reasoning, and 3-6 per-factor analyses. Cached server-side forever — repeat valuations are free.
+AI-powered domain valuation. Score 0-100, tier (common, decent, premium, ultra), USD range, reasoning, factors. Cached forever.
 
 ## Rate Limits (free, per source IP)
 
-IPv6 addresses are normalized to their /64 prefix before being counted (so attackers can't rotate the lower 64 bits).
+IPv6 addresses are counted by their /64 prefix.
 
-- Overall MCP frames: 200 / hour
-- check_domain_availability / get_domain_info: 60 / hour each
-- search_domains: 20 / hour (scrapes 6 registrars)
-- valuate_domain: 20 / hour (Gemini on cache miss; repeats are free)
+- Overall MCP calls: 200 / hour
+- check_domain_availability, get_domain_info: 60 / hour each
+- search_domains: 20 / hour
+- valuate_domain: 20 / hour
 
-Limits are per rolling-hour window from your first request. Going over returns an error your AI can read and explain.
+Per rolling-hour window from your first request. Going over returns an error your AI can read.
 
 ## Example prompts
 
-- "Is ad402.sh available? When does it expire?"
-- "Find me a cheap .io domain for a craft-beer brand under $20/yr."
+- "Is ad402.sh available?"
+- "Find a cheap .io domain for a craft-beer brand under $20/yr."
 - "Who owns github.com and when does it expire?"
-- "What's crypto.com roughly worth?"
+- "What is crypto.com worth?"
 
 ## Help
 
-Issues, feature requests, higher-limit tiers: https://github.com/adipundir/donadomains/issues
+Issues, feature requests, higher limits: https://github.com/adipundir/donadomains/issues
