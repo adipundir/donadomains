@@ -29,7 +29,7 @@ function ThemeSwitcher() {
 }
 
 function formatDate(iso?: string): string {
-  if (!iso) return "—";
+  if (!iso) return "–";
   try {
     return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
   } catch {
@@ -338,7 +338,7 @@ function DomainIntelPanel({ domain, onClose }: { domain: string; onClose: () => 
                         <div key={label} className="p-3 border-2 border-[var(--border-light)] bg-[var(--surface)] text-center">
                           <p className="font-comic-title text-[10px] uppercase tracking-widest opacity-50">{label}</p>
                           <p className="font-comic-body text-[13px] font-bold mt-1">
-                            {value ? formatDate(value) : "—"}
+                            {value ? formatDate(value) : "–"}
                           </p>
                         </div>
                       ))}
@@ -769,7 +769,7 @@ export default function Home() {
         </div>
       ) : result.available && (!result.buyLinks || result.buyLinks.length === 0) ? (
         <div className="mt-3 sm:mt-4 pt-3 border-t border-[var(--border-light)]">
-          <p className="font-comic-body text-sm opacity-60">No registrar pricing found — search directly on registrar sites to purchase.</p>
+          <p className="font-comic-body text-sm opacity-60">No registrar pricing found. Search directly on registrar sites to purchase.</p>
         </div>
       ) : null}
 
@@ -1168,7 +1168,7 @@ export default function Home() {
                           <div className="mb-10">
                             <h3 className="font-comic-title text-sm sm:text-base uppercase tracking-wide mb-4 flex items-center gap-2">
                               <span className="w-2 h-2 rounded-full bg-[var(--green)]" />
-                              Available — register now
+                              Available, register now
                             </h3>
                             {renderResults(restAvailable)}
                           </div>
