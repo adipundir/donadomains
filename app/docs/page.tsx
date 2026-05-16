@@ -201,16 +201,6 @@ export default function DocsPage() {
               </p>
             </Section>
 
-            <div
-              className="pt-8 mt-8 text-center font-comic-body text-sm opacity-50"
-              style={{ borderTop: "1px solid var(--border-light)" }}
-            >
-              Donadomains MCP. Built with{" "}
-              <a className="underline" href="https://modelcontextprotocol.io">
-                Model Context Protocol
-              </a>
-              .
-            </div>
           </main>
         </div>
       </div>
