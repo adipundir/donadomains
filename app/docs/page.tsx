@@ -1,4 +1,5 @@
-import { ThemeSwitcher, CodeBlock, SidebarNav, CopyDocsButton } from "./components";
+import { ThemeSwitcher, SidebarNav, CopyDocsButton } from "./components";
+import { InstallPicker } from "./InstallPicker";
 
 function Badge({ children, color = "accent" }: { children: React.ReactNode; color?: "accent" | "green" }) {
   return (
@@ -53,16 +54,6 @@ const NAV_ITEMS = [
   { id: "issues", label: "Issues" },
 ];
 
-const CLI_INSTALL = `claude mcp add --transport http donadomains https://www.donadomains.xyz/api/mcp`;
-
-const JSON_INSTALL = `{
-  "mcpServers": {
-    "donadomains": {
-      "type": "http",
-      "url": "https://www.donadomains.xyz/api/mcp"
-    }
-  }
-}`;
 
 export default function DocsPage() {
   return (
@@ -112,30 +103,7 @@ export default function DocsPage() {
 
             {/* Install */}
             <Section id="install" title="Install">
-              <p className="opacity-80">Pick one:</p>
-
-              <p className="font-comic-title text-sm uppercase tracking-wide mt-4 mb-2">
-                Claude Code CLI
-              </p>
-              <CodeBlock title="terminal">{CLI_INSTALL}</CodeBlock>
-
-              <p className="font-comic-title text-sm uppercase tracking-wide mt-6 mb-2">
-                Any other MCP client
-              </p>
-              <p className="opacity-70 text-sm mb-2">
-                Add this to your client&apos;s MCP server config (locations below):
-              </p>
-              <CodeBlock title="config">{JSON_INSTALL}</CodeBlock>
-
-              <div
-                className="rounded-lg overflow-hidden mt-4"
-                style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}
-              >
-                <FieldRow name="Claude Desktop (macOS)" type="" desc="~/Library/Application Support/Claude/claude_desktop_config.json" />
-                <FieldRow name="Claude Desktop (Windows)" type="" desc="%APPDATA%\Claude\claude_desktop_config.json" />
-                <FieldRow name="Cursor" type="" desc="Settings, MCP" />
-                <FieldRow name="Claude.ai web" type="" desc="Settings, Connectors, Add custom" />
-              </div>
+              <InstallPicker />
             </Section>
 
             {/* Tools */}
