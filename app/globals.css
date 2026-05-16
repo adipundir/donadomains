@@ -1,5 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bangers&display=swap');
 @import "tailwindcss";
+
+/* Tailwind v4 auto-detects content but respects .gitignore. The local
+   admin panel lives at app/admin/ and IS gitignored (so it never ships
+   to production), but that meant Tailwind was never scanning it and
+   never generating the utilities used there. Force a scan: */
+@source "./admin/**/*.{ts,tsx}";
+
+/* next-themes adds `class="dark"` to <html>. Tell Tailwind v4 to trigger
+   `dark:` utilities from that class instead of the prefers-color-scheme
+   media query — otherwise toggling the theme in-app flips CSS variables
+   but never activates any `dark:bg-*`, `dark:ring-*` etc. */
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --background: #fefcf6;
@@ -15,7 +27,7 @@
   --border: #1a1a1a;
   --border-light: rgba(26, 26, 26, 0.12);
   --font-title: 'Bangers', cursive;
-  --font-body: 'Comic Neue', cursive;
+  --font-body: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 html.dark {

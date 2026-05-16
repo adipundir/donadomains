@@ -2,6 +2,13 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { Providers } from "./providers";
+// Open Sauce Sans — the new body font. @fontsource self-hosts the woff2
+// files so we don't depend on a CDN. Importing the index loads all weights
+// from 300 to 900 (we currently use 400/600/700 around the app).
+import "@fontsource/open-sauce-sans/400.css";
+import "@fontsource/open-sauce-sans/500.css";
+import "@fontsource/open-sauce-sans/600.css";
+import "@fontsource/open-sauce-sans/700.css";
 import "./globals.css";
 
 const geistSans = Geist({
