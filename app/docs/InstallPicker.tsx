@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CodeBlock } from "./components";
 
 interface ClientOption {
@@ -37,9 +37,9 @@ const OPTIONS: ClientOption[] = [
     label: "Claude Desktop",
     json: JSON_DEFAULT,
     instructions:
-      "Paste the JSON into your config file, then restart Claude Desktop.\n\n" +
-      "macOS:   ~/Library/Application Support/Claude/claude_desktop_config.json\n" +
-      "Windows: %APPDATA%\\Claude\\claude_desktop_config.json",
+      "Easiest: ask Claude in the desktop app — \"add this MCP server: " +
+      URL +
+      "\". Claude will edit your config for you.\n\nOr paste the JSON manually into your config file, then restart Claude Desktop:\n\nmacOS:   ~/Library/Application Support/Claude/claude_desktop_config.json\nWindows: %APPDATA%\\Claude\\claude_desktop_config.json",
   },
   {
     id: "claude-web",
@@ -97,9 +97,116 @@ url = "${URL}"`,
     label: "Other MCP client",
     json: JSON_DEFAULT,
     instructions:
-      "Works in any client that supports the Streamable HTTP transport. Look for an MCP / context-server section in your client's settings.",
+      "Works in any MCP client. Look for an MCP / context-server section in your client's settings and paste the JSON.",
   },
 ];
+
+// ─── Custom dropdown ────────────────────────────────────────────────────────
+
+function ClientDropdown({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const selected = OPTIONS.find((o) => o.id === value) ?? OPTIONS[0];
+
+  // Close on outside click + Escape
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative inline-block">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="font-comic-body inline-flex items-center gap-1.5 text-sm font-medium px-2.5 py-1.5 rounded-md hover:bg-[var(--surface-muted)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="opacity-90">{selected.label}</span>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          className={`opacity-50 transition-transform ${open ? "rotate-180" : ""}`}
+          aria-hidden
+        >
+          <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          className="absolute right-0 top-full mt-1.5 z-50 min-w-[200px] py-1 rounded-lg shadow-lg animate-fadeIn"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border-light)",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+          }}
+        >
+          {OPTIONS.map((o) => {
+            const isSelected = o.id === value;
+            return (
+              <button
+                key={o.id}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                onClick={() => {
+                  onChange(o.id);
+                  setOpen(false);
+                }}
+                className={`font-comic-body w-full text-left text-sm px-3 py-1.5 flex items-center justify-between transition-colors ${
+                  isSelected
+                    ? "bg-[var(--accent-subtle)] text-[var(--foreground)] font-semibold"
+                    : "text-[var(--foreground)] hover:bg-[var(--surface-muted)]"
+                }`}
+              >
+                <span>{o.label}</span>
+                {isSelected && (
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    aria-hidden
+                  >
+                    <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main picker ─────────────────────────────────────────────────────────────
 
 export function InstallPicker() {
   const [selectedId, setSelectedId] = useState<string>(OPTIONS[0].id);
@@ -107,20 +214,8 @@ export function InstallPicker() {
 
   return (
     <div className="space-y-3">
-      {/* Right-aligned ghost dropdown — no border, opacity until hovered */}
       <div className="flex justify-end -mt-1">
-        <select
-          aria-label="MCP client"
-          value={selectedId}
-          onChange={(e) => setSelectedId(e.target.value)}
-          className="font-comic-body text-sm font-medium bg-transparent text-[var(--foreground)] opacity-60 hover:opacity-100 focus:opacity-100 cursor-pointer focus:outline-none transition-opacity pr-1"
-        >
-          {OPTIONS.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        <ClientDropdown value={selectedId} onChange={setSelectedId} />
       </div>
 
       <p className="font-comic-body text-sm opacity-80 whitespace-pre-line">

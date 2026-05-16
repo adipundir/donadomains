@@ -116,7 +116,7 @@ export default function DocsPage() {
                   style={{ background: "var(--surface)" }}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge color="green">check_domain_availability</Badge>
+                    <code className="font-mono text-sm font-semibold text-[var(--green)]">check_domain_availability</code>
                   </div>
                   <p className="opacity-80 text-sm">
                     Is a specific domain free? If yes, returns the lowest price and a buy
@@ -129,7 +129,7 @@ export default function DocsPage() {
                   style={{ background: "var(--surface)" }}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge color="green">search_domains</Badge>
+                    <code className="font-mono text-sm font-semibold text-[var(--green)]">search_domains</code>
                   </div>
                   <p className="opacity-80 text-sm">
                     Find available domains for a keyword across multiple registrars,
@@ -142,7 +142,7 @@ export default function DocsPage() {
                   style={{ background: "var(--surface)" }}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge color="green">get_domain_info</Badge>
+                    <code className="font-mono text-sm font-semibold text-[var(--green)]">get_domain_info</code>
                   </div>
                   <p className="opacity-80 text-sm">
                     Detailed registration info for a domain: registrar, dates,
@@ -155,7 +155,7 @@ export default function DocsPage() {
                   style={{ background: "var(--surface)" }}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge color="green">valuate_domain</Badge>
+                    <code className="font-mono text-sm font-semibold text-[var(--green)]">valuate_domain</code>
                   </div>
                   <p className="opacity-80 text-sm">
                     AI-powered domain valuation. Score, tier, USD range, reasoning, factors.

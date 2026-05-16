@@ -156,7 +156,7 @@ Per rolling-hour window from your first request. Exceeding a bucket returns the 
 
 - Rate limit exceeded: wait for the rolling-hour window to reset.
 - Higher limits: open an issue at https://github.com/adipundir/donadomains/issues.
-- Client only supports stdio: upgrade to a current version that supports the Streamable HTTP transport.
+- Client only supports stdio: upgrade to a current version with remote-MCP support.
 
 ## Source
 
