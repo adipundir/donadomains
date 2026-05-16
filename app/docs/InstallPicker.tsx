@@ -30,7 +30,7 @@ const OPTIONS: ClientOption[] = [
     id: "claude-code",
     label: "Claude Code (CLI)",
     cli: `claude mcp add --transport http donadomains ${URL}`,
-    instructions: "Paste the command in your terminal. The server is registered in your project's local Claude Code config.",
+    instructions: "Paste the command in your terminal.",
   },
   {
     id: "claude-desktop",
@@ -45,7 +45,7 @@ const OPTIONS: ClientOption[] = [
     id: "claude-web",
     label: "Claude.ai (web)",
     instructions:
-      "Open Claude.ai → Settings → Connectors → Add custom connector. Paste the URL below.",
+      "Open Claude.ai → Settings → Connectors → Add custom connector. Paste the URL.",
     json: URL,
   },
   {
@@ -97,7 +97,7 @@ url = "${URL}"`,
     label: "Other MCP client",
     json: JSON_DEFAULT,
     instructions:
-      "Works in any client that supports the Streamable HTTP transport. Look for an 'MCP server' or 'context server' section in your client's settings and paste the JSON.",
+      "Works in any client that supports the Streamable HTTP transport. Look for an MCP / context-server section in your client's settings.",
   },
 ];
 
@@ -106,20 +106,14 @@ export function InstallPicker() {
   const option = OPTIONS.find((o) => o.id === selectedId) ?? OPTIONS[0];
 
   return (
-    <div className="space-y-4">
-      <div>
-        <label
-          htmlFor="install-picker"
-          className="font-comic-body text-xs font-bold uppercase tracking-widest opacity-50 block mb-2"
-        >
-          What are you using?
-        </label>
+    <div className="space-y-3">
+      {/* Right-aligned ghost dropdown — no border, opacity until hovered */}
+      <div className="flex justify-end -mt-1">
         <select
-          id="install-picker"
+          aria-label="MCP client"
           value={selectedId}
           onChange={(e) => setSelectedId(e.target.value)}
-          className="font-comic-body w-full sm:max-w-xs px-4 py-3 text-base font-medium border-2 border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] focus:outline-none focus:shadow-[3px_3px_0px_var(--accent)] transition-shadow cursor-pointer"
-          style={{ borderRadius: 0 }}
+          className="font-comic-body text-sm font-medium bg-transparent text-[var(--foreground)] opacity-60 hover:opacity-100 focus:opacity-100 cursor-pointer focus:outline-none transition-opacity pr-1"
         >
           {OPTIONS.map((o) => (
             <option key={o.id} value={o.id}>
@@ -129,21 +123,17 @@ export function InstallPicker() {
         </select>
       </div>
 
-      <div>
-        <p className="font-comic-body text-sm opacity-80 whitespace-pre-line">
-          {option.instructions}
-        </p>
+      <p className="font-comic-body text-sm opacity-80 whitespace-pre-line">
+        {option.instructions}
+      </p>
 
-        {option.cli && (
-          <CodeBlock title="terminal">{option.cli}</CodeBlock>
-        )}
+      {option.cli && <CodeBlock title="terminal">{option.cli}</CodeBlock>}
 
-        {option.json && (
-          <CodeBlock title={option.id === "claude-web" ? "URL" : "config"}>
-            {option.json}
-          </CodeBlock>
-        )}
-      </div>
+      {option.json && (
+        <CodeBlock title={option.id === "claude-web" ? "URL" : "config"}>
+          {option.json}
+        </CodeBlock>
+      )}
     </div>
   );
 }
