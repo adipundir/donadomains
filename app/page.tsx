@@ -657,12 +657,10 @@ export default function Home() {
           onChange={(e) => setKeyword(e.target.value)}
           placeholder="search for a domain name..."
           className={`font-comic-body flex-1 bg-transparent text-[var(--foreground)] placeholder-[var(--foreground)]/30 focus:outline-none ${compact ? "px-4 py-3 text-base" : "px-5 py-4 text-lg"} font-bold`}
-          disabled={loading}
         />
         <button
           type="submit"
-          disabled={loading}
-          className={`font-comic-title shrink-0 flex items-center justify-center bg-[var(--foreground)] text-[var(--background)] uppercase tracking-wider transition-opacity hover:opacity-90 ${loading ? "cursor-wait" : ""} ${compact ? "px-5 text-base" : "px-7 text-lg"}`}
+          className={`font-comic-title shrink-0 flex items-center justify-center bg-[var(--foreground)] text-[var(--background)] uppercase tracking-wider transition-opacity hover:opacity-90 ${compact ? "px-5 text-base" : "px-7 text-lg"}`}
         >
           {loading ? (
             <span className="flex items-center gap-2">
@@ -965,7 +963,7 @@ export default function Home() {
                     key={domain}
                     type="button"
                     onClick={() => { setKeyword(domain); setError(null); }}
-                    className="font-comic-body px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-bold border border-[var(--border-light)] bg-[var(--surface)] hover:border-[var(--border)] transition-colors"
+                    className="font-comic-body px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium border border-[var(--border-light)] bg-[var(--surface)] hover:border-[var(--border)] transition-colors"
                   >
                     {domain}
                   </button>

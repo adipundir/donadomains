@@ -1,6 +1,6 @@
 # Donadomains MCP
 
-> Free MCP server. Domain search, WHOIS, and AI valuation for AI agents.
+> Free MCP server. Domain search, registration info, and AI valuation for AI agents.
 
 Connect: https://www.donadomains.xyz/api/mcp
 Full docs: https://www.donadomains.xyz/docs
@@ -33,30 +33,31 @@ No signup, no API key.
 
 ### 1. check_domain_availability(domain)
 
-Is a domain free right now? If available, returns the lowest price and which registrar. If taken, returns ownership info (registrar, dates, nameservers, status).
+Is a domain free right now? If available, returns the lowest price and a buy link. If taken, returns ownership info (registrar, dates, nameservers, status).
 
 ### 2. search_domains(keyword, limit?, tldFilter?, includeTaken?)
 
-Search a keyword across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun). Returns available domains with prices.
+Search a keyword across multiple registrars. Returns available domains with prices.
 
 ### 3. get_domain_info(domain)
 
-WHOIS, RDAP, DNS intel for a registered domain. Registrar, dates, nameservers, status codes, DNSSEC.
+Detailed registration info for a domain. Registrar, dates, nameservers, status codes, DNSSEC.
 
 ### 4. valuate_domain(domain, registered?, isPremium?, registrationPrice?)
 
-AI-powered domain valuation. Score 0-100, tier (common, decent, premium, ultra), USD range, reasoning, factors. Cached forever.
+AI-powered domain valuation. Score 0-100, tier (common, decent, premium, ultra), USD range, reasoning, factors.
 
-## Rate Limits (free, per source IP)
+## Rate Limits
 
-IPv6 addresses are counted by their /64 prefix.
+Free, per source IP.
 
 - Overall MCP calls: 200 / hour
-- check_domain_availability, get_domain_info: 60 / hour each
+- check_domain_availability: 60 / hour
+- get_domain_info: 60 / hour
 - search_domains: 20 / hour
 - valuate_domain: 20 / hour
 
-Per rolling-hour window from your first request. Going over returns an error your AI can read.
+Per rolling-hour window from your first request.
 
 ## Example prompts
 

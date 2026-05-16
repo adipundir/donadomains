@@ -1,13 +1,12 @@
 # Donadomains MCP, Full Reference
 
-> Free MCP server. Domain search, WHOIS, and AI valuation for AI agents.
+> Free MCP server. Domain search, registration info, and AI valuation for AI agents.
 
 Connect URL: https://www.donadomains.xyz/api/mcp
 Web docs: https://www.donadomains.xyz/docs
 Source: https://github.com/adipundir/donadomains
 
 Auth: None. No signup, no API key. Rate-limited per IP (see below).
-Transport: Streamable HTTP.
 
 ## Install
 
@@ -42,7 +41,7 @@ Common config-file locations:
 
 ### Tool 1: check_domain_availability
 
-Check if a specific domain is available for registration right now.
+Check if a specific domain is available for registration.
 
 #### Input
 
@@ -64,11 +63,11 @@ If available:
 If taken:
 - `domain` (string)
 - `available` (false)
-- `owner` (object): registrar, registrant, organization, created, expires, updated, nameservers, status, dnssec, dataSources
+- `owner` (object): registrar, registrant, organization, created, expires, updated, nameservers, status, dnssec
 
 ### Tool 2: search_domains
 
-Search a keyword across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.com, Porkbun) in parallel. Returns available domains with prices.
+Search a keyword across multiple registrars in parallel. Returns available domains with prices.
 
 #### Input
 
@@ -89,14 +88,7 @@ Search a keyword across 6 registrars (GoDaddy, Namecheap, Dynadot, Hover, Name.c
 
 ### Tool 3: get_domain_info
 
-Deep WHOIS, RDAP, DNS intelligence for a registered domain. Layered pipeline:
-
-1. RDAP for TLDs that publish one.
-2. Port-43 WHOIS for RDAP-less ccTLDs (.sh, .io, .ac, .ws, .nu, .to).
-3. DNS-over-HTTPS for nameservers and resolution.
-4. who.is scrape as last-resort fallback.
-
-Postgres-cached with adaptive TTLs (24h registered, 1h unregistered, 5min errors). Repeat lookups sub-100ms.
+Detailed registration info for a domain. Works for every TLD.
 
 #### Input
 
@@ -105,8 +97,6 @@ Postgres-cached with adaptive TTLs (24h registered, 1h unregistered, 5min errors
 | domain | string | Yes | Fully qualified domain, e.g. "github.com". |
 
 #### Returns
-
-DomainIntel object:
 
 - `domain` (string)
 - `registered` (boolean)
@@ -117,13 +107,10 @@ DomainIntel object:
 - `contactEmail`, `contactPhone`, `contactAddress` (string, if not privacy-protected)
 - `nameservers` (string[])
 - `dnssec` (string)
-- `sources` (string[]): any of "rdap", "whois43", "dns", "who.is"
-- `timing` (object): ms per source
-- `fetchedAt` (ISO string): last fresh fetch
 
 ### Tool 4: valuate_domain
 
-AI-powered domain valuation using Google Gemini 2.0 Flash. Live registration intel is pulled into the model context. Results are cached in Postgres forever. First call hits Gemini, repeat calls are free and instant.
+AI-powered domain valuation.
 
 #### Input
 
@@ -131,7 +118,7 @@ AI-powered domain valuation using Google Gemini 2.0 Flash. Live registration int
 |---|---|---|---|
 | domain | string | Yes | Domain to value, e.g. "crypto.com". |
 | registered | boolean | No | Skip the registration lookup if you already know. |
-| isPremium | boolean | No | Flag as registrar-premium (anchors valuation up). |
+| isPremium | boolean | No | Flag as registrar-premium. |
 | registrationPrice | number | No | Current registration price in USD, if known. |
 
 #### Returns
@@ -140,23 +127,22 @@ AI-powered domain valuation using Google Gemini 2.0 Flash. Live registration int
 - `score` (number, 0-100)
 - `tier` ("common" | "decent" | "premium" | "ultra")
 - `estimatedValue` (string, e.g. "$500 - $2,000")
-- `reasoning` (string, 2-3 sentences)
-- `factors` (array of {label, impact, detail}), 3-6 entries
-- `cached` (boolean): true if served from cache
+- `reasoning` (string)
+- `factors` (array of {label, impact, detail})
 
 ## Rate Limits
 
-Free, unauthenticated, per source IP. IPv6 addresses are counted by their /64 prefix (so attackers can't rotate the lower 64 bits to bypass).
+Free. Rate-limited per source IP.
 
-| Bucket | Limit | Notes |
-|---|---|---|
-| Overall MCP calls | 200 / hour | Catch-all per IP. |
-| check_domain_availability | 60 / hour | Cached, light. Shares bucket with get_domain_info. |
-| get_domain_info | 60 / hour | Cached, light. |
-| search_domains | 20 / hour | Scrapes 6 registrars. |
-| valuate_domain | 20 / hour | Gemini on cache miss. Repeats are free. |
+| Bucket | Limit |
+|---|---|
+| Overall MCP calls | 200 / hour |
+| check_domain_availability | 60 / hour |
+| get_domain_info | 60 / hour |
+| search_domains | 20 / hour |
+| valuate_domain | 20 / hour |
 
-Windows are rolling-hour, starting from your first request. Exceeding a bucket returns the error inside a tool-result content block. Repeat lookups of the same domain hit the Postgres cache (about 50ms) and don't burn quota beyond the first call.
+Per rolling-hour window from your first request. Exceeding a bucket returns the error inside a tool-result content block.
 
 ## Example prompts
 
@@ -166,31 +152,11 @@ Windows are rolling-hour, starting from your first request. Exceeding a bucket r
 - "What is crypto.com worth?"
 - "Check who owns these 5 domains: github.com, openai.com, anthropic.com, cloudflare.com, stripe.com."
 
-## How the pipeline works
-
-When `get_domain_info` or `check_domain_availability` is called:
-
-1. Postgres cache is checked. If fresh, returned in about 50ms.
-2. On miss, in parallel:
-   - DNS-over-HTTPS (Cloudflare) for nameservers and resolution status.
-   - RDAP if the TLD has an IANA-registered RDAP server.
-   - WHOIS port-43 otherwise (or as fallback if RDAP returns sparse data).
-3. If domain is registered but registrar or dates are still missing, Firecrawl scrapes who.is as last resort.
-4. Result is written to cache with adaptive TTL:
-   - Full data, registered: 24h.
-   - Partial data, registered: 6h.
-   - Unregistered: 1h.
-   - Pending-delete or near-expiry: 1h.
-   - Error: 5min.
-
-When `search_domains` is called, all 6 registrar search pages are scraped in parallel via Firecrawl. Pricing is merged and the cheapest option marked `isCheapest: true`.
-
 ## Troubleshooting
 
-- Rate limit exceeded: wait for the rolling-hour window to reset, or reduce call frequency.
-- Slow first search: `search_domains` cold takes 5-15s. Cached subsequent reads are fast.
+- Rate limit exceeded: wait for the rolling-hour window to reset.
 - Higher limits: open an issue at https://github.com/adipundir/donadomains/issues.
-- Client only supports stdio: upgrade to a current version that supports the Streamable HTTP transport. A stdio-transport package is on the roadmap but not yet shipped.
+- Client only supports stdio: upgrade to a current version that supports the Streamable HTTP transport.
 
 ## Source
 

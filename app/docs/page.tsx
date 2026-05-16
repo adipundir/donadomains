@@ -103,7 +103,7 @@ export default function DocsPage() {
                 Donadomains <span style={{ color: "var(--accent)" }}>MCP</span>
               </h1>
               <p className="font-comic-body text-base opacity-80 max-w-2xl">
-                Domain search, WHOIS, and AI valuation, available to your AI agent.
+                Domain search, intel, and AI valuation, available to your AI agent.
               </p>
               <p className="font-comic-body text-sm opacity-60 mt-2">
                 Free. No signup. No API key.
@@ -164,8 +164,8 @@ export default function DocsPage() {
                     <Badge color="green">search_domains</Badge>
                   </div>
                   <p className="opacity-80 text-sm">
-                    Find available domains for a keyword across GoDaddy, Namecheap, Dynadot,
-                    Hover, Name.com, and Porkbun. Best for brand or project naming.
+                    Find available domains for a keyword across multiple registrars,
+                    with live pricing. Best for brand or project naming.
                   </p>
                 </div>
 
@@ -177,8 +177,8 @@ export default function DocsPage() {
                     <Badge color="green">get_domain_info</Badge>
                   </div>
                   <p className="opacity-80 text-sm">
-                    Deep WHOIS, RDAP, and DNS info for a registered domain. Registrar,
-                    dates, nameservers, status codes, DNSSEC.
+                    Detailed registration info for a domain: registrar, dates,
+                    nameservers, status codes, DNSSEC.
                   </p>
                 </div>
 
@@ -199,24 +199,23 @@ export default function DocsPage() {
             {/* Rate Limits */}
             <Section id="rate-limits" title="Rate Limits">
               <p className="opacity-80">
-                Free. Rate-limited per source IP. IPv6 addresses are counted by their /64 prefix.
+                Free. Rate-limited per source IP.
               </p>
 
               <div
                 className="rounded-lg overflow-hidden mt-4"
                 style={{ background: "var(--surface)", border: "1px solid var(--border-light)" }}
               >
-                <FieldRow name="Overall MCP calls" type="200 / hour" desc="Catch-all per IP." />
-                <FieldRow name="check_domain_availability" type="60 / hour" desc="Cached, light. Shares with get_domain_info." />
-                <FieldRow name="get_domain_info" type="60 / hour" desc="Cached, light." />
-                <FieldRow name="search_domains" type="20 / hour" desc="Scrapes 6 registrars." />
-                <FieldRow name="valuate_domain" type="20 / hour" desc="Hits Gemini on cache miss. Repeats are free." />
+                <FieldRow name="Overall MCP calls" type="200 / hour" desc="" />
+                <FieldRow name="check_domain_availability" type="60 / hour" desc="" />
+                <FieldRow name="get_domain_info" type="60 / hour" desc="" />
+                <FieldRow name="search_domains" type="20 / hour" desc="" />
+                <FieldRow name="valuate_domain" type="20 / hour" desc="" />
               </div>
 
               <p className="opacity-70 text-sm mt-4">
-                Windows are rolling-hour from your first request. Going over returns an
-                error your AI can read and explain. Repeat lookups of the same domain hit
-                the cache and don&apos;t count against the per-tool quota beyond the first call.
+                Windows are rolling-hour from your first request. Exceeding a limit
+                returns an error your AI can read and explain.
               </p>
             </Section>
 

@@ -1,6 +1,6 @@
 # Donadomains MCP
 
-Domain search, WHOIS, and AI valuation, available to your AI agent over the Model Context Protocol.
+Domain search, registration info, and AI valuation, available to your AI agent over the Model Context Protocol.
 
 Free. No signup. No API key.
 
@@ -37,57 +37,24 @@ Config file locations:
 
 | Tool | Purpose |
 |---|---|
-| `check_domain_availability` | Is a domain free? If yes, lowest price + buy link. If no, owner info. |
-| `search_domains` | Find available domains for a keyword across 6 registrars. |
-| `get_domain_info` | WHOIS, RDAP, DNS intel for a registered domain. |
+| `check_domain_availability` | Is a domain free? If yes, lowest price + buy link. If no, ownership info. |
+| `search_domains` | Find available domains for a keyword with live pricing. |
+| `get_domain_info` | Detailed registration info for a domain. |
 | `valuate_domain` | AI-powered USD valuation with reasoning. |
 
-## Rate limits (free, per source IP, IPv6 counted by /64)
+## Rate limits
+
+Free, per source IP.
 
 | Bucket | Limit |
 |---|---|
 | Overall MCP calls | 200 / hour |
-| `check_domain_availability`, `get_domain_info` | 60 / hour each |
+| `check_domain_availability` | 60 / hour |
+| `get_domain_info` | 60 / hour |
 | `search_domains` | 20 / hour |
 | `valuate_domain` | 20 / hour |
 
-Repeat lookups of the same domain hit the Postgres cache and don't burn extra quota. Need higher limits? [Open an issue](https://github.com/adipundir/donadomains/issues).
-
-## How it works
-
-For any taken domain, four data sources are layered to fill in the full picture (registrar, dates, nameservers, DNSSEC, status codes, public registrant info):
-
-1. **RDAP** via IANA bootstrap, for TLDs that publish one.
-2. **Port-43 WHOIS** via `node:net`, for RDAP-less ccTLDs like `.sh`, `.io`, `.ac`.
-3. **DNS-over-HTTPS** via Cloudflare, for nameservers and resolution.
-4. **who.is scrape** via Firecrawl, as last-resort fallback.
-
-Postgres-backed read-through cache with adaptive TTLs keeps repeat lookups sub-100ms.
-
-## Tech stack
-
-- Next.js 16, React, TypeScript, Tailwind CSS, hosted on Vercel
-- `@modelcontextprotocol/sdk` Streamable HTTP at `/api/mcp`
-- Firecrawl for registrar page scraping
-- RDAP, port-43 WHOIS, DNS-over-HTTPS for layered intel
-- Neon Postgres + Drizzle ORM for cache, rate limits, watch system
-- Inngest for background jobs
-- Brevo for email notifications
-- Gemini 2.0 Flash for valuation
-
-## Repo layout
-
-```
-.
-├── app/                ← Next.js app + MCP HTTP route
-│   ├── api/mcp/        ← Streamable HTTP MCP endpoint
-│   ├── lib/whois/      ← Port-43 WHOIS client
-│   ├── lib/mcp-tools/  ← In-app MCP tool handlers
-│   └── lib/intel-cache.ts
-├── mcp/                ← Source for a future stdio package (not yet on npm)
-├── drizzle/            ← Migrations
-└── Makefile            ← install / build / test / publish / clean
-```
+Need higher limits? [Open an issue](https://github.com/adipundir/donadomains/issues).
 
 ## License
 
