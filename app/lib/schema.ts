@@ -74,6 +74,8 @@ export const scrapeFailures = pgTable(
   (table) => [
     index("scrape_failures_registrar_idx").on(table.registrar),
     index("scrape_failures_created_at_idx").on(table.createdAt),
+    // Composite for `GROUP BY registrar WHERE created_at > X` (failure stats).
+    index("scrape_failures_registrar_created_at_idx").on(table.registrar, table.createdAt),
   ],
 );
 
@@ -121,6 +123,8 @@ export const mcpToolCalls = pgTable(
     index("mcp_tool_calls_created_at_idx").on(table.createdAt),
     index("mcp_tool_calls_tool_idx").on(table.tool),
     index("mcp_tool_calls_query_idx").on(table.query),
+    // Composite for `GROUP BY tool WHERE created_at >= X` (daily stats per tool).
+    index("mcp_tool_calls_tool_created_at_idx").on(table.tool, table.createdAt),
   ],
 );
 

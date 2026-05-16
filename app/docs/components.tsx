@@ -148,7 +148,23 @@ export function SidebarNav({ items }: { items: { id: string; label: string; head
       if (el) observer.observe(el);
     }
 
-    return () => observer.disconnect();
+    // The last section can't naturally enter the observer's activation band
+    // (top 20-40% of the viewport) because the page ends before it scrolls
+    // that high. Force-activate it when the user has reached the bottom.
+    const onScroll = () => {
+      const atBottom =
+        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 64;
+      if (atBottom && items.length > 0) {
+        setActiveSection(items[items.length - 1].id);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", onScroll);
+    };
   }, [items]);
 
   return (
