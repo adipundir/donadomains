@@ -4,7 +4,7 @@ import { InstallPicker } from "./InstallPicker";
 function Badge({ children, color = "accent" }: { children: React.ReactNode; color?: "accent" | "green" }) {
   return (
     <span
-      className="inline-block px-2 py-0.5 text-xs font-bold rounded font-comic-body"
+      className="inline-block px-2 py-0.5 text-xs rounded font-comic-body"
       style={{
         background: color === "green" ? "var(--green)" : "var(--accent)",
         color: color === "green" ? "#fff" : "#000",
@@ -22,13 +22,13 @@ function FieldRow({ name, type, desc, optional }: { name: string; type: string; 
       style={{ borderBottom: "1px solid var(--border-light)" }}
     >
       <div className="flex items-center gap-2 sm:w-56 shrink-0">
-        <code className="text-sm font-bold" style={{ color: "var(--green)" }}>{name}</code>
+        <code className="text-sm" style={{ color: "var(--green)" }}>{name}</code>
         {optional && (
-          <span className="text-xs opacity-50 font-comic-body">optional</span>
+          <span className="text-xs opacity-60 font-comic-body">optional</span>
         )}
       </div>
       <code className="text-xs opacity-60 sm:w-28 shrink-0">{type}</code>
-      <span className="font-comic-body text-sm opacity-80">{desc}</span>
+      <span className="font-comic-body text-sm opacity-60">{desc}</span>
     </div>
   );
 }
@@ -65,7 +65,7 @@ export default function DocsPage() {
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <a
             href="/"
-            className="font-comic-title text-2xl uppercase tracking-wide hover:opacity-70 transition-opacity"
+            className="font-comic-title text-2xl uppercase tracking-wide hover:opacity-60 transition-opacity"
           >
             Donadomains
           </a>
@@ -93,7 +93,7 @@ export default function DocsPage() {
               <h1 className="font-comic-title text-3xl sm:text-4xl uppercase tracking-wide mb-3">
                 Donadomains <span style={{ color: "var(--accent)" }}>MCP</span>
               </h1>
-              <p className="font-comic-body text-base opacity-80 max-w-2xl">
+              <p className="font-comic-body text-base opacity-60 max-w-2xl">
                 Domain search, intel, and AI valuation, available to your AI agent.
               </p>
               <p className="font-comic-body text-sm opacity-60 mt-2">
@@ -108,7 +108,7 @@ export default function DocsPage() {
 
             {/* Tools */}
             <Section id="tools" title="Tools">
-              <p className="opacity-80">Four tools your AI can call. It picks automatically based on your question.</p>
+              <p className="opacity-60">Four tools your AI can call. It picks automatically based on your question.</p>
 
               <div className="space-y-4 mt-4">
                 <div
@@ -116,9 +116,9 @@ export default function DocsPage() {
                   style={{ background: "var(--surface)" }}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <code className="font-mono text-sm font-semibold text-[var(--green)]">check_domain_availability</code>
+                    <code className="font-mono text-sm text-[var(--green)]">check_domain_availability</code>
                   </div>
-                  <p className="opacity-80 text-sm">
+                  <p className="opacity-60 text-sm">
                     Is a specific domain free? If yes, returns the lowest price and a buy
                     link. If taken, returns the registrar, expiry date, and nameservers.
                   </p>
@@ -129,9 +129,9 @@ export default function DocsPage() {
                   style={{ background: "var(--surface)" }}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <code className="font-mono text-sm font-semibold text-[var(--green)]">search_domains</code>
+                    <code className="font-mono text-sm text-[var(--green)]">search_domains</code>
                   </div>
-                  <p className="opacity-80 text-sm">
+                  <p className="opacity-60 text-sm">
                     Find available domains for a keyword across multiple registrars,
                     with live pricing. Best for brand or project naming.
                   </p>
@@ -142,9 +142,9 @@ export default function DocsPage() {
                   style={{ background: "var(--surface)" }}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <code className="font-mono text-sm font-semibold text-[var(--green)]">get_domain_info</code>
+                    <code className="font-mono text-sm text-[var(--green)]">get_domain_info</code>
                   </div>
-                  <p className="opacity-80 text-sm">
+                  <p className="opacity-60 text-sm">
                     Detailed registration info for a domain: registrar, dates,
                     nameservers, status codes, DNSSEC.
                   </p>
@@ -155,9 +155,9 @@ export default function DocsPage() {
                   style={{ background: "var(--surface)" }}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <code className="font-mono text-sm font-semibold text-[var(--green)]">valuate_domain</code>
+                    <code className="font-mono text-sm text-[var(--green)]">valuate_domain</code>
                   </div>
-                  <p className="opacity-80 text-sm">
+                  <p className="opacity-60 text-sm">
                     AI-powered domain valuation. Score, tier, USD range, reasoning, factors.
                   </p>
                 </div>
@@ -166,7 +166,7 @@ export default function DocsPage() {
 
             {/* Rate Limits */}
             <Section id="rate-limits" title="Rate Limits">
-              <p className="opacity-80">
+              <p className="opacity-60">
                 Free. Rate-limited per source IP.
               </p>
 
@@ -181,7 +181,7 @@ export default function DocsPage() {
                 <FieldRow name="valuate_domain" type="20 / hour" desc="" />
               </div>
 
-              <p className="opacity-70 text-sm mt-4">
+              <p className="opacity-60 text-sm mt-4">
                 Windows are rolling-hour from your first request. Exceeding a limit
                 returns an error your AI can read and explain.
               </p>
@@ -189,7 +189,7 @@ export default function DocsPage() {
 
             {/* Issues */}
             <Section id="issues" title="Issues, Feedback, Higher Limits">
-              <p className="opacity-80">
+              <p className="opacity-60">
                 Bug reports, feature requests, or want a higher limit?{" "}
                 <a
                   className="underline"

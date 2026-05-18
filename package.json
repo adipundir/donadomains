@@ -15,7 +15,6 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
-    "@fontsource/open-sauce-sans": "^5.2.5",
     "@google/generative-ai": "^0.24.1",
     "@mendable/firecrawl-js": "^4.15.4",
     "@neondatabase/serverless": "^1.0.2",

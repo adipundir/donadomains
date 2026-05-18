@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Bangers&display=swap');
 @import "tailwindcss";
 
 /* Tailwind v4 auto-detects content but respects .gitignore. The local
@@ -26,8 +25,6 @@
   --red-subtle: #fef2f2;
   --border: #1a1a1a;
   --border-light: rgba(26, 26, 26, 0.12);
-  --font-title: 'Bangers', cursive;
-  --font-body: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 html.dark {
@@ -41,8 +38,8 @@ html.dark {
   --green: #6ec88e;
   --green-subtle: #111a14;
   --red-subtle: #1a0a0a;
-  --border: #ededed;
-  --border-light: rgba(237, 237, 237, 0.1);
+  --border: rgba(237, 237, 237, 0.35);
+  --border-light: rgba(237, 237, 237, 0.08);
 }
 
 body {
@@ -108,8 +105,10 @@ h1, h2, h3, h4 {
 /* ── Highlight ── */
 
 .comic-highlight {
-  background: linear-gradient(transparent 50%, var(--accent) 50%);
-  padding: 0 6px;
+  background: var(--accent);
+  padding: 2px 10px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 /* ── Search bar glow ── */

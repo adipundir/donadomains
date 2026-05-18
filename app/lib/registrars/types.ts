@@ -22,6 +22,13 @@ export interface RegistrarSearchHit {
   explicitlyTaken?: boolean;
   /** Domain is listed as premium or aftermarket (not available at standard price). */
   premium?: boolean;
+  /**
+   * The registrar has pricing for this TLD but did not verify the specific
+   * domain is available (e.g. Cloudflare's pricing list). Use the hit's price
+   * as a buy-link option, but don't let it vote for "available" on its own —
+   * require at least one verifying registrar before showing the domain.
+   */
+  availabilityUnknown?: boolean;
   registration?: number;
   renewal?: number;
   currency: "USD";

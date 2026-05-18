@@ -116,18 +116,23 @@ export function buildSearchResults(
       similarCount++;
     }
 
+    // Skip domains where only price-only sources (e.g. Cloudflare) returned
+    // hits — they don't verify availability, so we'd be guessing.
+    const verifyingVotes = registrarVotes.filter((h) => !h.availabilityUnknown);
+    if (verifyingVotes.length === 0) continue;
+
     // Determine availability:
     // 1. DNS is authoritative when present
-    // 2. "explicitlyTaken" from any registrar is definitive (e.g. "Hire a Broker", "unavailable")
-    // 3. Otherwise, available if any registrar says so with a price
+    // 2. "explicitlyTaken" from any verifying registrar is definitive
+    // 3. Otherwise, available if any verifying registrar says so with a price
     let available: boolean;
-    const anyExplicitlyTaken = registrarVotes.some((h) => h.explicitlyTaken);
+    const anyExplicitlyTaken = verifyingVotes.some((h) => h.explicitlyTaken);
     if (dnsAvailability?.has(domain)) {
       available = !anyPremium && (dnsAvailability.get(domain) ?? false);
     } else if (anyExplicitlyTaken) {
       available = false;
     } else {
-      available = !anyPremium && registrarVotes.some((h) => h.available && h.registration != null);
+      available = !anyPremium && verifyingVotes.some((h) => h.available && h.registration != null);
     }
 
     const buyLinks = available ? buildMergedBuyLinks(domain, hits) : [];

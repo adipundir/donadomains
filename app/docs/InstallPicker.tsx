@@ -136,7 +136,7 @@ function ClientDropdown({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="font-comic-body inline-flex items-center gap-1.5 text-sm font-medium px-2.5 py-1.5 rounded-md hover:bg-[var(--surface-muted)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
+        className="font-comic-body inline-flex items-center gap-1.5 text-sm px-2.5 py-1.5 rounded-md hover:bg-[var(--surface-muted)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
         aria-haspopup="listbox"
         aria-expanded={open}
       >
@@ -148,7 +148,7 @@ function ClientDropdown({
           fill="none"
           stroke="currentColor"
           strokeWidth="2.5"
-          className={`opacity-50 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`opacity-60 transition-transform ${open ? "rotate-180" : ""}`}
           aria-hidden
         >
           <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
@@ -179,7 +179,7 @@ function ClientDropdown({
                 }}
                 className={`font-comic-body w-full text-left text-sm px-3 py-1.5 flex items-center justify-between transition-colors ${
                   isSelected
-                    ? "bg-[var(--accent-subtle)] text-[var(--foreground)] font-semibold"
+                    ? "bg-[var(--accent-subtle)] text-[var(--foreground)]"
                     : "text-[var(--foreground)] hover:bg-[var(--surface-muted)]"
                 }`}
               >
@@ -218,7 +218,7 @@ export function InstallPicker() {
         <ClientDropdown value={selectedId} onChange={setSelectedId} />
       </div>
 
-      <p className="font-comic-body text-sm opacity-80 whitespace-pre-line">
+      <p className="font-comic-body text-sm opacity-60 whitespace-pre-line">
         {option.instructions}
       </p>
 

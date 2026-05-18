@@ -36,7 +36,7 @@ function VerifyContent() {
       {status === "loading" && (
         <div className="flex items-center justify-center gap-2 py-8">
           <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent)] loading-stage-pulse" />
-          <span className="font-comic-body text-sm font-bold opacity-50">
+          <span className="font-comic-body text-sm opacity-60">
             {unwatch ? "Unsubscribing..." : "Verifying..."}
           </span>
         </div>
@@ -52,7 +52,7 @@ function VerifyContent() {
               {unwatch ? "Unsubscribed" : "Verified"}
             </span>
           </div>
-          <p className="font-comic-body font-bold">{message}</p>
+          <p className="font-comic-body">{message}</p>
           {domain && (
             <p className="font-comic-body text-sm opacity-60">
               Monitoring: <strong>{domain}</strong>
@@ -69,7 +69,7 @@ function VerifyContent() {
             </svg>
             <span className="font-comic-title uppercase tracking-wide text-sm">Error</span>
           </div>
-          <p className="font-comic-body font-bold">{message}</p>
+          <p className="font-comic-body">{message}</p>
         </div>
       )}
     </>
@@ -86,7 +86,7 @@ export default function VerifyPage() {
           fallback={
             <div className="flex items-center justify-center gap-2 py-8">
               <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent)] loading-stage-pulse" />
-              <span className="font-comic-body text-sm font-bold opacity-50">Loading...</span>
+              <span className="font-comic-body text-sm opacity-60">Loading...</span>
             </div>
           }
         >

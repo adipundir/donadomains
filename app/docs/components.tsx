@@ -39,7 +39,7 @@ export function CodeBlock({ children, title }: { children: string; title?: strin
     <div className="relative my-4">
       {title && (
         <div
-          className="font-comic-body text-xs font-bold px-4 py-1.5 rounded-t-lg"
+          className="font-comic-body text-xs px-4 py-1.5 rounded-t-lg"
           style={{
             background: "var(--surface-muted)",
             borderBottom: "1px solid var(--border-light)",
@@ -94,7 +94,7 @@ export function TabbedCode({ tabs }: { tabs: { label: string; code: string }[] }
             key={tab.label}
             type="button"
             onClick={() => setActive(i)}
-            className="font-comic-body text-xs font-bold px-4 py-1.5 transition-colors"
+            className="font-comic-body text-xs px-4 py-1.5 transition-colors"
             style={{
               color: i === active ? "var(--foreground)" : "var(--foreground)",
               opacity: i === active ? 1 : 0.4,
@@ -174,7 +174,7 @@ export function SidebarNav({ items }: { items: { id: string; label: string; head
           <li key={item.id} className={item.heading && i > 0 ? "pt-3" : ""}>
             <a
               href={`#${item.id}`}
-              className={`block px-3 py-1.5 rounded transition-colors ${item.heading ? "text-xs font-comic-title uppercase tracking-wider" : "text-sm font-comic-body"}`}
+              className={`block px-3 py-1.5 rounded transition-colors ${item.heading ? "text-xs font-comic-title uppercase tracking-wide" : "text-sm font-comic-body"}`}
               style={{
                 background: activeSection === item.id ? "var(--surface-muted)" : "transparent",
                 fontWeight: activeSection === item.id || item.heading ? 700 : 400,

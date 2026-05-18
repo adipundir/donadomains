@@ -97,6 +97,10 @@ async function searchDomains(query: string): Promise<RegistrarSearchResult> {
     hits.push({
       domain,
       available: true,
+      // CF's JSON is a price list, not an availability check. Set this flag so
+      // the merge logic in buildSearchResults requires another registrar to
+      // confirm the domain is actually available before showing it.
+      availabilityUnknown: true,
       registration: price.registration,
       renewal: price.renewal,
       currency: "USD",

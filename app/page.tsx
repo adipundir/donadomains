@@ -118,19 +118,19 @@ function ValuationDisplay({ valuation }: { valuation: DomainValuation }) {
       <div className="flex items-center justify-between gap-3 mb-2">
         <div className="flex items-center gap-2">
           <span className="font-comic-title text-2xl">{valuation.score}</span>
-          <span className="font-comic-title text-[10px] uppercase tracking-widest opacity-60">/100</span>
+          <span className="font-comic-title text-xs uppercase tracking-wide opacity-60">/100</span>
           <span className={`font-comic-title text-xs uppercase tracking-wide px-2 py-0.5 border ${TIER_COLORS[valuation.tier]}`}>
             {valuation.tier}
           </span>
         </div>
         <span className="font-comic-title text-sm tracking-wide">{valuation.estimatedValue}</span>
       </div>
-      <p className="font-comic-body text-xs opacity-70 mb-2">{valuation.reasoning}</p>
+      <p className="font-comic-body text-xs opacity-60 mb-2">{valuation.reasoning}</p>
       <div className="flex flex-wrap gap-1.5">
         {valuation.factors.map((f) => (
           <span
             key={f.label}
-            className={`font-comic-body text-[10px] font-bold px-1.5 py-0.5 border ${
+            className={`font-comic-body text-xs px-1.5 py-0.5 border ${
               f.impact === "positive" ? "border-green-300 text-green-600 dark:text-green-400" :
               f.impact === "negative" ? "border-red-300 text-red-500 dark:text-red-400" :
               "border-[var(--border-light)] opacity-60"
@@ -170,8 +170,8 @@ function NotifyForm({ domain }: { domain: string }) {
 
   return (
     <div className="mt-5 pt-5 border-t border-[var(--border-light)]">
-      <p className="font-comic-title text-xs uppercase tracking-widest mb-2">Notify when available</p>
-      <p className="font-comic-body text-sm opacity-70 mb-3">
+      <p className="font-comic-title text-xs uppercase tracking-wide mb-2">Notify when available</p>
+      <p className="font-comic-body text-sm opacity-60 mb-3">
         Get an email when this domain becomes available to register.
       </p>
 
@@ -180,7 +180,7 @@ function NotifyForm({ domain }: { domain: string }) {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--green,#22c55e)] shrink-0">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          <span className="font-comic-body text-xs font-bold">{message}</span>
+          <span className="font-comic-body text-xs">{message}</span>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex gap-2">
@@ -190,13 +190,13 @@ function NotifyForm({ domain }: { domain: string }) {
             value={email}
             onChange={(e) => { setEmail(e.target.value); setStatus("idle"); }}
             placeholder="your@email.com"
-            className="font-comic-body flex-1 px-3 py-2 text-sm font-bold bg-[var(--surface)] border border-[var(--border-light)] focus:border-[var(--border)] focus:outline-none"
+            className="font-comic-body flex-1 px-3 py-2 text-sm bg-[var(--surface)] border border-[var(--border-light)] focus:border-[var(--border)] focus:outline-none"
             disabled={status === "loading"}
           />
           <button
             type="submit"
             disabled={status === "loading"}
-            className="font-comic-title px-4 py-2 text-xs uppercase tracking-wide border-2 border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)] hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="font-comic-title px-4 py-2 text-xs uppercase tracking-wide border-2 border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)] hover:opacity-90 transition-opacity disabled:opacity-60"
           >
             {status === "loading" ? "..." : "Notify Me"}
           </button>
@@ -204,7 +204,7 @@ function NotifyForm({ domain }: { domain: string }) {
       )}
 
       {status === "error" && (
-        <p className="font-comic-body text-xs text-red-400 font-bold mt-2">{message}</p>
+        <p className="font-comic-body text-xs text-red-400 mt-2">{message}</p>
       )}
     </div>
   );
@@ -243,8 +243,8 @@ function DomainIntelPanel({ domain, onClose }: { domain: string; onClose: () => 
     if (!value) return null;
     return (
       <div className="flex flex-col gap-1 py-3 border-b border-[var(--border-light)]">
-        <span className="font-comic-title text-[10px] uppercase tracking-widest opacity-50">{label}</span>
-        <span className="font-comic-body text-[15px] font-bold break-all">{value}</span>
+        <span className="font-comic-title text-xs uppercase tracking-wide opacity-60">{label}</span>
+        <span className="font-comic-body text-base break-all">{value}</span>
       </div>
     );
   };
@@ -263,19 +263,19 @@ function DomainIntelPanel({ domain, onClose }: { domain: string; onClose: () => 
               <p className="font-comic-title text-lg uppercase tracking-wide">{domain}</p>
               {!loading && intel && (
                 intel.registered ? (
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide border border-[var(--border)] opacity-70">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs uppercase tracking-wide border border-[var(--border)] opacity-60">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
                     Registered
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--green)] border border-[var(--green)]">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs uppercase tracking-wide text-[var(--green)] border border-[var(--green)]">
                     <span className="w-1.5 h-1.5 rounded-full bg-[var(--green)]" />
                     Available
                   </span>
                 )
               )}
             </div>
-            <p className="font-comic-body text-xs opacity-70">Domain Intelligence</p>
+            <p className="font-comic-body text-xs opacity-60">Domain Intelligence</p>
           </div>
           <button
             type="button"
@@ -300,8 +300,8 @@ function DomainIntelPanel({ domain, onClose }: { domain: string; onClose: () => 
 
           {error && (
             <div className="text-center py-16">
-              <p className="font-comic-title text-xl uppercase">Something went wrong</p>
-              <p className="font-comic-body text-sm mt-2 opacity-70">{error}</p>
+              <p className="font-comic-title text-2xl uppercase">Something went wrong</p>
+              <p className="font-comic-body text-sm mt-2 opacity-60">{error}</p>
             </div>
           )}
 
@@ -318,17 +318,17 @@ function DomainIntelPanel({ domain, onClose }: { domain: string; onClose: () => 
                   {/* ── Owner Section ── */}
                   {(intel.registrant || intel.organization) && (
                     <div className="p-4 border-2 border-[var(--border-light)] bg-[var(--surface)]">
-                      <p className="font-comic-title text-xs uppercase tracking-widest mb-1.5">Owner</p>
-                      {intel.registrant && <p className="font-comic-body text-base font-bold">{intel.registrant}</p>}
+                      <p className="font-comic-title text-xs uppercase tracking-wide mb-1.5">Owner</p>
+                      {intel.registrant && <p className="font-comic-body text-base">{intel.registrant}</p>}
                       {intel.organization && intel.organization !== intel.registrant && (
-                        <p className="font-comic-body text-sm opacity-80 mt-0.5">{intel.organization}</p>
+                        <p className="font-comic-body text-sm opacity-60 mt-0.5">{intel.organization}</p>
                       )}
                     </div>
                   )}
 
                   {/* ── Key Dates ── */}
                   <div>
-                    <p className="font-comic-title text-xs uppercase tracking-widest mb-2.5">Key Dates</p>
+                    <p className="font-comic-title text-xs uppercase tracking-wide mb-2.5">Key Dates</p>
                     <div className="grid grid-cols-3 gap-2">
                       {[
                         { label: "Created", value: intel.created },
@@ -336,8 +336,8 @@ function DomainIntelPanel({ domain, onClose }: { domain: string; onClose: () => 
                         { label: "Expires", value: intel.expires },
                       ].map(({ label, value }) => (
                         <div key={label} className="p-3 border-2 border-[var(--border-light)] bg-[var(--surface)] text-center">
-                          <p className="font-comic-title text-[10px] uppercase tracking-widest opacity-50">{label}</p>
-                          <p className="font-comic-body text-[13px] font-bold mt-1">
+                          <p className="font-comic-title text-xs uppercase tracking-wide opacity-60">{label}</p>
+                          <p className="font-comic-body text-sm mt-1">
                             {value ? formatDate(value) : "–"}
                           </p>
                         </div>
@@ -348,7 +348,7 @@ function DomainIntelPanel({ domain, onClose }: { domain: string; onClose: () => 
                   {/* ── Registration Details ── */}
                   {(intel.registrar || intel.registrarUrl) && (
                     <div>
-                      <p className="font-comic-title text-xs uppercase tracking-widest mb-2.5">Registration</p>
+                      <p className="font-comic-title text-xs uppercase tracking-wide mb-2.5">Registration</p>
                       <div className="space-y-0.5">
                         {intelRow("Registrar", intel.registrar)}
                         {intelRow("Registrar URL", intel.registrarUrl)}
@@ -359,7 +359,7 @@ function DomainIntelPanel({ domain, onClose }: { domain: string; onClose: () => 
                   {/* ── Contact Info ── */}
                   {(intel.contactEmail || intel.contactPhone || intel.contactAddress) && (
                     <div>
-                      <p className="font-comic-title text-xs uppercase tracking-widest mb-2.5">Contact</p>
+                      <p className="font-comic-title text-xs uppercase tracking-wide mb-2.5">Contact</p>
                       <div className="space-y-0.5">
                         {intelRow("Email", intel.contactEmail)}
                         {intelRow("Phone", intel.contactPhone)}
@@ -390,16 +390,16 @@ function DomainIntelPanel({ domain, onClose }: { domain: string; onClose: () => 
                   {/* ── Technical Details ── */}
                   {(intel.dnssec || (intel.nameservers && intel.nameservers.length > 0) || (intel.status && intel.status.length > 0)) && (
                     <div>
-                      <p className="font-comic-title text-xs uppercase tracking-widest mb-2.5">Technical</p>
+                      <p className="font-comic-title text-xs uppercase tracking-wide mb-2.5">Technical</p>
                       <div className="space-y-0.5">
                         {intelRow("DNSSEC", intel.dnssec)}
 
                         {intel.nameservers && intel.nameservers.length > 0 && (
                           <div className="flex flex-col gap-1 py-2.5 border-b border-[var(--border-light)]">
-                            <span className="font-comic-title text-[10px] uppercase tracking-widest opacity-50">Nameservers</span>
+                            <span className="font-comic-title text-xs uppercase tracking-wide opacity-60">Nameservers</span>
                             <div className="flex flex-wrap gap-1.5 mt-0.5">
                               {intel.nameservers.map((ns) => (
-                                <span key={ns} className="font-comic-body text-xs font-bold px-2 py-1 border border-[var(--border-light)] bg-[var(--surface)]">
+                                <span key={ns} className="font-comic-body text-xs px-2 py-1 border border-[var(--border-light)] bg-[var(--surface)]">
                                   {ns}
                                 </span>
                               ))}
@@ -409,10 +409,10 @@ function DomainIntelPanel({ domain, onClose }: { domain: string; onClose: () => 
 
                         {intel.status && intel.status.length > 0 && (
                           <div className="flex flex-col gap-1 py-2.5 border-b border-[var(--border-light)]">
-                            <span className="font-comic-title text-[10px] uppercase tracking-widest opacity-50">Status</span>
+                            <span className="font-comic-title text-xs uppercase tracking-wide opacity-60">Status</span>
                             <div className="flex flex-wrap gap-1.5 mt-0.5">
                               {intel.status.map((s) => (
-                                <span key={s} className="font-comic-body text-xs font-bold px-2 py-1 border border-[var(--border-light)] bg-[var(--surface)]">
+                                <span key={s} className="font-comic-body text-xs px-2 py-1 border border-[var(--border-light)] bg-[var(--surface)]">
                                   {STATUS_LABELS[s] || s}
                                 </span>
                               ))}
@@ -430,7 +430,7 @@ function DomainIntelPanel({ domain, onClose }: { domain: string; onClose: () => 
 
               {/* Sources footer */}
               <div className="pt-4 border-t border-[var(--border-light)]">
-                <p className="font-comic-body text-[11px] uppercase tracking-widest opacity-60">
+                <p className="font-comic-body text-xs uppercase tracking-wide opacity-60">
                   Sources: {intel.sources.join(" → ")}
                   {Object.keys(intel.timing).length > 0 && (
                     <span className="ml-2">
@@ -484,12 +484,12 @@ function SearchProgress({
             return (
               <span
                 key={name}
-                className={`font-comic-title text-[10px] uppercase tracking-wide ${
+                className={`font-comic-title text-xs uppercase tracking-wide ${
                   s === "done"
-                    ? "opacity-50"
+                    ? "opacity-60"
                     : s === "failed"
-                    ? "opacity-25 line-through"
-                    : "opacity-30"
+                    ? "opacity-60 line-through"
+                    : "opacity-60"
                 }`}
               >
                 {s === "done" ? "✓" : s === "failed" ? "✗" : "·"} {name}
@@ -499,11 +499,11 @@ function SearchProgress({
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {resultCount > 0 && (
-            <span className="font-comic-body text-[10px] opacity-40">
+            <span className="font-comic-body text-xs opacity-60">
               {resultCount} result{resultCount !== 1 ? "s" : ""}
             </span>
           )}
-          <span className="font-comic-body text-[10px] opacity-30 tabular-nums">
+          <span className="font-comic-body text-xs opacity-60 tabular-nums">
             {elapsed}s
           </span>
         </div>
@@ -655,25 +655,17 @@ export default function Home() {
           type="text"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
-          placeholder="search for a domain name..."
-          className={`font-comic-body flex-1 bg-transparent text-[var(--foreground)] placeholder-[var(--foreground)]/30 focus:outline-none ${compact ? "px-4 py-3 text-base" : "px-5 py-4 text-lg"} font-bold`}
+          placeholder="Search for a domain name…"
+          className={`font-comic-body flex-1 bg-transparent text-[var(--foreground)] placeholder-[var(--foreground)]/40 focus:outline-none ${compact ? "px-4 py-3 text-base" : "px-5 py-4 text-lg"}`}
         />
         <button
           type="submit"
-          className={`font-comic-title shrink-0 flex items-center justify-center bg-[var(--foreground)] text-[var(--background)] uppercase tracking-wider transition-opacity hover:opacity-90 ${compact ? "px-5 text-base" : "px-7 text-lg"}`}
+          className={`font-comic-title shrink-0 flex items-center justify-center bg-[var(--foreground)] text-[var(--background)] uppercase tracking-wide transition-opacity hover:opacity-90 ${compact ? "px-5 text-base" : "px-7 text-lg"}`}
         >
-          {loading ? (
-            <span className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-current bounce-dot" />
-              <span className="w-2.5 h-2.5 rounded-full bg-current bounce-dot" style={{ animationDelay: "0.15s" }} />
-              <span className="w-2.5 h-2.5 rounded-full bg-current bounce-dot" style={{ animationDelay: "0.3s" }} />
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              <SearchIcon className="w-5 h-5" />
-              <span className="hidden sm:inline">Search</span>
-            </span>
-          )}
+          <span className="flex items-center gap-2">
+            <SearchIcon className="w-5 h-5" />
+            <span className="hidden sm:inline">Search</span>
+          </span>
         </button>
       </div>
     </form>
@@ -692,21 +684,21 @@ export default function Home() {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <p className="font-comic-title text-lg sm:text-xl md:text-2xl uppercase tracking-wide break-all">{result.domain}</p>
+            <p className="font-comic-title text-lg sm:text-2xl uppercase tracking-wide break-all">{result.domain}</p>
             {result.available ? (
-              <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] sm:text-[11px] font-bold uppercase text-[var(--green)] tracking-wide">
+              <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 text-xs sm:text-xs uppercase text-[var(--green)] tracking-wide">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                 Available
               </span>
             ) : (
-              <span className="shrink-0 px-2 py-0.5 text-[11px] font-bold uppercase opacity-60 tracking-wide">
+              <span className="shrink-0 px-2 py-0.5 text-xs uppercase opacity-60 tracking-wide">
                 Taken
               </span>
             )}
           </div>
           {result.matchType === "similar" && (
-            <p className="text-xs font-bold opacity-60 mt-1">
-              <span className="px-1.5 py-0.5 border border-[var(--border-light)] text-[10px] uppercase">similar</span>
+            <p className="text-xs opacity-60 mt-1">
+              <span className="px-1.5 py-0.5 border border-[var(--border-light)] text-xs uppercase">similar</span>
             </p>
           )}
         </div>
@@ -720,7 +712,7 @@ export default function Home() {
               valuations[result.domain]?.valuation
                 ? "border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)]"
                 : "border-[var(--border)] bg-[var(--surface)] hover:bg-[var(--foreground)] hover:text-[var(--surface)]"
-            } disabled:opacity-50`}
+            } disabled:opacity-60`}
           >
             {valuations[result.domain]?.loading ? "Evaluating..." : valuations[result.domain]?.valuation ? "Hide Evaluation" : "Evaluate"}
           </button>
@@ -746,16 +738,16 @@ export default function Home() {
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-bold transition-all ${link.premium
+                className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm transition-all ${link.premium
                   ? "border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/30 hover:border-amber-600"
                   : link.isCheapest
                   ? "bg-[var(--foreground)] text-[var(--background)] border-2 border-[var(--foreground)] shadow-[2px_2px_0px_var(--accent)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px]"
                   : "border border-[var(--border-light)] hover:border-[var(--border)] bg-[var(--surface)]"
                   }`}
               >
-                {link.premium && <span className="font-comic-title text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-400">Premium</span>}
-                <span className="font-comic-title uppercase tracking-wide">{link.name}</span>
-                {link.price && <span className={link.isCheapest && !link.premium ? "font-comic-title" : ""}>{link.price}</span>}
+                {link.premium && <span className="text-xs text-amber-600 dark:text-amber-400">Premium</span>}
+                <span>{link.name}</span>
+                {link.price && <span>{link.price}</span>}
                 {link.isCheapest && !link.premium && <StarIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[var(--accent)]" />}
               </a>
             ))}
@@ -763,7 +755,7 @@ export default function Home() {
         </div>
       ) : result.available && loading ? (
         <div className="mt-3 sm:mt-4 pt-3 border-t border-[var(--border-light)]">
-          <p className="font-comic-title text-xs uppercase tracking-widest opacity-60 loading-ellipsis">Comparing prices</p>
+          <p className="font-comic-title text-xs uppercase tracking-wide opacity-60 loading-ellipsis">Comparing prices</p>
         </div>
       ) : result.available && (!result.buyLinks || result.buyLinks.length === 0) ? (
         <div className="mt-3 sm:mt-4 pt-3 border-t border-[var(--border-light)]">
@@ -785,7 +777,7 @@ export default function Home() {
         </div>
       )}
       {valuations[result.domain]?.error && (
-        <p className="font-comic-body text-xs text-red-400 font-bold mt-2">{valuations[result.domain].error}</p>
+        <p className="font-comic-body text-xs text-red-400 mt-2">{valuations[result.domain].error}</p>
       )}
     </div>
   );
@@ -796,7 +788,7 @@ export default function Home() {
     return (
       <div
         key={`${result.domain}-${index}`}
-        className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 py-3 border-b border-[var(--border-light)] transition-all animate-fadeInUp ${result.available ? "hover:bg-[var(--surface)]" : "opacity-70"
+        className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 py-3 border-b border-[var(--border-light)] transition-all animate-fadeInUp ${result.available ? "hover:bg-[var(--surface)]" : "opacity-60"
           }`}
         style={{ animationDelay: `${Math.min(index * 25, 200)}ms` }}
       >
@@ -804,24 +796,24 @@ export default function Home() {
         <div className="flex items-center gap-2 sm:min-w-[260px]">
           <p className="font-comic-title text-base sm:text-lg uppercase tracking-wide break-all">{result.domain}</p>
           {result.available ? (
-            <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold uppercase text-[var(--green)] tracking-wide">
+            <span className="shrink-0 inline-flex items-center gap-1 text-xs uppercase text-[var(--green)] tracking-wide">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
               <span className="hidden xs:inline">Available</span>
             </span>
           ) : (
-            <span className="shrink-0 text-[11px] font-bold uppercase text-[var(--foreground)]/40 tracking-wide">Taken</span>
+            <span className="shrink-0 text-xs uppercase text-[var(--foreground)]/60 tracking-wide">Taken</span>
           )}
         </div>
 
         {/* Price or RDAP details for taken */}
         <div className="flex-1 min-w-0">
           {result.available && cheapest ? (
-            <span className="font-comic-body text-sm font-bold">
+            <span className="font-comic-body text-sm">
               from <span className="text-[var(--green)]">{cheapest.price}</span>
-              <span className="opacity-40 ml-1">· {cheapest.name}</span>
+              <span className="opacity-60 ml-1">· {cheapest.name}</span>
             </span>
           ) : !result.available ? (
-            <span className="font-comic-body text-xs opacity-50 italic">Taken</span>
+            <span className="font-comic-body text-xs opacity-60 italic">Taken</span>
           ) : null}
         </div>
 
@@ -835,25 +827,25 @@ export default function Home() {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold transition-all ${link.premium
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs transition-all ${link.premium
                     ? "border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/30"
                     : link.isCheapest
                     ? "bg-[var(--foreground)] text-[var(--background)] border border-[var(--foreground)]"
                     : "border border-[var(--border-light)] hover:border-[var(--border)]"
                     }`}
                 >
-                  {link.premium && <span className="font-comic-title text-[9px] uppercase tracking-wider text-amber-600 dark:text-amber-400">Premium</span>}
+                  {link.premium && <span className="font-comic-title text-[9px] uppercase tracking-wide text-amber-600 dark:text-amber-400">Premium</span>}
                   <span className="font-comic-title uppercase tracking-wide">{link.name}</span>
-                  {link.price && <span className="opacity-70">{link.price}</span>}
+                  {link.price && <span className="opacity-60">{link.price}</span>}
                   {link.isCheapest && !link.premium && <StarIcon className="w-3 h-3 text-[var(--accent)]" />}
                 </a>
               ))}
               {result.buyLinks.length > 3 && (
-                <span className="text-[10px] font-bold opacity-40">+{result.buyLinks.length - 3}</span>
+                <span className="text-xs opacity-60">+{result.buyLinks.length - 3}</span>
               )}
             </>
           ) : result.available && loading ? (
-            <span className="font-comic-title text-[10px] uppercase tracking-widest opacity-40 loading-ellipsis">Comparing</span>
+            <span className="font-comic-title text-xs uppercase tracking-wide opacity-60 loading-ellipsis">Comparing</span>
           ) : !result.available ? (
             <button
               type="button"
@@ -871,7 +863,7 @@ export default function Home() {
               valuations[result.domain]?.valuation
                 ? "border border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)]"
                 : "border border-[var(--border-light)] hover:border-[var(--border)]"
-            } disabled:opacity-50`}
+            } disabled:opacity-60`}
           >
             {valuations[result.domain]?.loading ? "..." : valuations[result.domain]?.valuation ? "Hide" : "Evaluate"}
           </button>
@@ -883,7 +875,7 @@ export default function Home() {
           </div>
         )}
         {valuations[result.domain]?.error && (
-          <p className="font-comic-body text-xs text-red-400 font-bold sm:col-span-full">{valuations[result.domain].error}</p>
+          <p className="font-comic-body text-xs text-red-400 sm:col-span-full">{valuations[result.domain].error}</p>
         )}
       </div>
     );
@@ -919,14 +911,14 @@ export default function Home() {
           <button
             type="button"
             onClick={() => { setSearchedKeyword(null); setResults([]); setError(null); setFilter("all"); }}
-            className="font-comic-title text-2xl uppercase tracking-wide hover:opacity-70 transition-opacity"
+            className="font-comic-title text-2xl uppercase tracking-wide hover:opacity-60 transition-opacity"
           >
             Donadomains
           </button>
           <div className="flex items-center gap-3 sm:gap-4">
             <a
               href="/docs"
-              className="font-comic-title text-xs sm:text-sm uppercase tracking-wide px-2.5 py-1 rounded transition-opacity hover:opacity-80"
+              className="font-comic-title text-xs sm:text-sm uppercase tracking-wide px-2.5 py-1 rounded transition-opacity hover:opacity-60"
               style={{ background: "var(--accent)", color: "#000" }}
             >
               MCP
@@ -939,31 +931,31 @@ export default function Home() {
       {/* ── Pre-search landing ── */}
       {!hasSearched ? (
         <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6">
-          <div className="w-full max-w-xl text-center space-y-4 sm:space-y-6 md:space-y-8">
-            <div className="space-y-1.5 sm:space-y-2 md:space-y-3">
-              <h1 className="font-comic-title text-2xl sm:text-4xl md:text-5xl uppercase tracking-wide leading-tight">
+          <div className="w-full max-w-xl text-center space-y-6 sm:space-y-8">
+            <div className="space-y-3">
+              <h1 className="font-comic-title text-4xl sm:text-5xl uppercase tracking-wide leading-tight">
                 Domain search, <span className="comic-highlight">sorted</span>
               </h1>
-              <p className="font-comic-body text-xs sm:text-base md:text-lg text-[var(--foreground)]/60 max-w-lg mx-auto">
-                One search. Prices from GoDaddy, Namecheap & more. RDAP lookups for taken domains.
+              <p className="text-base sm:text-lg text-[var(--foreground)]/60 max-w-lg mx-auto">
+                One search. Prices from GoDaddy, Namecheap & more.
               </p>
             </div>
 
             {searchBar()}
 
             {error && (
-              <p className="text-sm font-bold text-[var(--accent-red,#ff5252)]">{error}</p>
+              <p className="text-sm text-[var(--accent-red,#ff5252)]">{error}</p>
             )}
 
-            <div className="pt-1 sm:pt-2">
-              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest opacity-30 mb-2 sm:mb-3">Try searching</p>
-              <div className="flex flex-wrap justify-center gap-1.5 sm:gap-2">
+            <div className="pt-2">
+              <p className="text-sm text-[var(--foreground)]/60 mb-3">Try searching</p>
+              <div className="flex flex-wrap justify-center gap-2">
                 {HOT_DOMAINS.map((domain) => (
                   <button
                     key={domain}
                     type="button"
                     onClick={() => { setKeyword(domain); setError(null); }}
-                    className="font-comic-body px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm font-medium border border-[var(--border-light)] bg-[var(--surface)] hover:border-[var(--border)] transition-colors"
+                    className="px-3 py-1.5 text-sm border border-[var(--border-light)] bg-[var(--surface)] hover:border-[var(--border)] transition-colors"
                   >
                     {domain}
                   </button>
@@ -987,7 +979,7 @@ export default function Home() {
               {error && (
                 <div className="mb-6 p-4 border-2 border-[var(--border)] bg-[var(--surface)] text-center">
                   <span className="font-comic-title text-lg uppercase">Oops! </span>
-                  <span className="font-bold">{error}</span>
+                  <span>{error}</span>
                 </div>
               )}
 
@@ -1088,7 +1080,7 @@ export default function Home() {
                   <div>
                     {/* Toolbar: count + filters + view toggle */}
                     <div className="flex flex-wrap items-center gap-3 mb-8">
-                      <h2 className="font-comic-title text-xl sm:text-2xl uppercase tracking-wide mr-auto">
+                      <h2 className="font-comic-title text-2xl sm:text-2xl uppercase tracking-wide mr-auto">
                         {filtered.length} result{filtered.length !== 1 ? "s" : ""}
                       </h2>
 
@@ -1101,7 +1093,7 @@ export default function Home() {
                               key={f}
                               type="button"
                               onClick={() => setFilter(f)}
-                              className={`px-2.5 py-1.5 text-xs sm:text-sm font-bold uppercase tracking-wide transition-all border whitespace-nowrap ${filter === f
+                              className={`px-2.5 py-1.5 text-xs sm:text-sm uppercase tracking-wide transition-all border whitespace-nowrap ${filter === f
                                 ? "bg-[var(--foreground)] text-[var(--background)] border-[var(--foreground)]"
                                 : "bg-[var(--surface)] text-[var(--foreground)] border-[var(--border-light)] hover:border-[var(--border)]"
                                 }`}
@@ -1135,8 +1127,8 @@ export default function Home() {
 
                     {filtered.length === 0 ? (
                       <div className="text-center py-16">
-                        <p className="font-comic-title text-xl uppercase opacity-50">No {filter} domains found</p>
-                        <button type="button" onClick={() => setFilter("all")} className="mt-3 font-bold underline text-sm hover:opacity-80">
+                        <p className="font-comic-title text-2xl uppercase opacity-60">No {filter} domains found</p>
+                        <button type="button" onClick={() => setFilter("all")} className="mt-3 underline text-sm hover:opacity-60">
                           Show all
                         </button>
                       </div>
@@ -1155,7 +1147,7 @@ export default function Home() {
                         )}
                         {restTaken.length > 0 && (
                           <div>
-                            <h3 className="font-comic-title text-sm sm:text-base uppercase tracking-wide mb-4 opacity-40">Taken</h3>
+                            <h3 className="font-comic-title text-sm sm:text-base uppercase tracking-wide mb-4 opacity-60">Taken</h3>
                             {renderResults(restTaken)}
                           </div>
                         )}
@@ -1173,7 +1165,7 @@ export default function Home() {
                         )}
                         {restTaken.length > 0 && (
                           <div>
-                            <h3 className="font-comic-title text-sm sm:text-base uppercase tracking-wide mb-4 opacity-40">Taken</h3>
+                            <h3 className="font-comic-title text-sm sm:text-base uppercase tracking-wide mb-4 opacity-60">Taken</h3>
                             {renderResults(restTaken)}
                           </div>
                         )}
@@ -1188,7 +1180,7 @@ export default function Home() {
                   <p className="font-comic-title text-2xl uppercase tracking-wide">
                     No results for &quot;{searchedKeyword}&quot;
                   </p>
-                  <p className="font-comic-body mt-2 opacity-50">Try a different keyword or domain name</p>
+                  <p className="font-comic-body mt-2 opacity-60">Try a different keyword or domain name</p>
                 </div>
               )}
             </div>
@@ -1217,9 +1209,9 @@ export default function Home() {
 
       {/* ── Footer ── */}
       <footer className={`flex items-center justify-center gap-1.5 ${!hasSearched ? 'py-2 sm:py-3' : 'py-5'}`}>
-        <span className="text-xs font-bold uppercase tracking-widest opacity-25">a product of</span>
-        <img src="/D.svg" alt="Donalabs" className="h-4 w-4 opacity-25" />
-        <span className="text-xs font-bold uppercase tracking-widest opacity-25">donalabs</span>
+        <span className="text-xs uppercase tracking-wide opacity-60">a product of</span>
+        <img src="/D.svg" alt="Donalabs" className="h-4 w-4 opacity-60" />
+        <span className="text-xs uppercase tracking-wide opacity-60">donalabs</span>
       </footer>
     </div>
   );

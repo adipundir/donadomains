@@ -11,14 +11,16 @@ import dynadot from "./dynadot";
 import namecom from "./namecom";
 import hover from "./hover";
 import porkbun from "./porkbun";
+import cloudflare from "./cloudflare";
 
 export type { BuyLink, RegistrarSearchResult, RegistrarSearchHit } from "./types";
 
 // Ordered by reliability + speed so the streaming UI shows results fast.
-// All registrars use Firecrawl scraping for live, accurate pricing.
-// Dynadot/Name.com (5s/2s wait) fill the first batch with GoDaddy.
-// Namecheap/Hover (4s/5s wait) in the second batch. Porkbun (8s wait) last.
+// Scraping registrars (Firecrawl) verify availability + price.
+// Cloudflare contributes at-cost prices only — it doesn't verify availability,
+// so its hits are only shown for domains another registrar confirms.
 export const ALL_REGISTRARS: RegistrarModule[] = [
+  cloudflare,
   dynadot,
   namecom,
   godaddy,
