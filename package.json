@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@mendable/firecrawl-js": "^4.15.4",
+    "@mendable/firecrawl-js": "^4.25.0",
     "@neondatabase/serverless": "^1.0.2",
     "@vercel/analytics": "^1.6.1",
     "drizzle-orm": "^0.45.1",

@@ -99,14 +99,27 @@ function isRetryable(error: string): boolean {
  *   - Retries once if the page rendered but returned too few lines (JS didn't finish)
  *   - Backs off 1.5s → 3s between retries
  */
+/**
+ * Optional extras for hostile targets — GoDaddy needs `proxy: stealth` plus
+ * a persistent browser profile so the Akamai `_abck` sensor token builds up
+ * across requests. Other registrars don't need any of this.
+ */
+export interface FirecrawlScrapeExtras {
+  proxy?: "basic" | "stealth" | "enhanced" | "auto";
+  profile?: { name: string; saveChanges?: boolean };
+  /** Per-attempt Firecrawl timeout. Defaults to 20s. */
+  timeoutMs?: number;
+}
+
 export async function firecrawlScrape(
   url: string,
   waitMs: number,
   apiKey: string,
+  extras: FirecrawlScrapeExtras = {},
 ): Promise<FirecrawlScrapeResult> {
   await semaphore.acquire(apiKey);
   try {
-    return await firecrawlScrapeInner(url, waitMs, apiKey);
+    return await firecrawlScrapeInner(url, waitMs, apiKey, extras);
   } finally {
     semaphore.release(apiKey);
   }
@@ -116,10 +129,12 @@ async function firecrawlScrapeInner(
   url: string,
   waitMs: number,
   apiKey: string,
+  extras: FirecrawlScrapeExtras,
 ): Promise<FirecrawlScrapeResult> {
   const MAX_RETRIES = 2;
   const BACKOFF = [1500, 3000];
   const tag = url.replace(/^https?:\/\/(?:www\.)?/, "").split("/")[0]; // e.g. "godaddy.com"
+  const perAttemptTimeout = extras.timeoutMs ?? 20000;
 
   let lastError = "";
   let bestResult: FirecrawlScrapeResult | null = null;
@@ -138,7 +153,9 @@ async function firecrawlScrapeInner(
       const doc = await fc.scrape(url, {
         formats: ["markdown"],
         waitFor: waitMs,
-        timeout: 20000,
+        timeout: perAttemptTimeout,
+        ...(extras.proxy ? { proxy: extras.proxy } : {}),
+        ...(extras.profile ? { profile: extras.profile } : {}),
       });
 
       const markdown = doc.markdown ?? "";

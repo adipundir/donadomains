@@ -3,132 +3,184 @@ import type {
   RegistrarSearchResult,
   RegistrarSearchHit,
 } from "./types";
+import { firecrawlScrape } from "./firecrawl-client";
 
 const NAME = "GoDaddy";
 
-// GoDaddy's website is behind Akamai bot protection that Firecrawl (even with
-// stealth proxy + long timeouts) cannot bypass. We use the official Domains
-// API instead — auth'd via SSO key, free tier, supports bulk lookups.
-//
-// Get keys from https://developer.godaddy.com (instant, no reseller needed).
-// Set in .env:
-//   GODADDY_API_KEY=<your key>
-//   GODADDY_API_SECRET=<your secret>
-const API_BULK_URL = "https://api.godaddy.com/v1/domains/available?checkType=FULL&forTransfer=false";
-const API_TIMEOUT_MS = 15_000;
+const SEARCH_URL = (q: string) =>
+  `https://www.godaddy.com/domainsearch/find?checkAvail=1&domainToCheck=${encodeURIComponent(q)}`;
+
+const HEADING_DOMAIN_RE = /^##\s+([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.(?:[a-z]{2,}\.)?[a-z]{2,})\s*$/i;
+const PRICE_RE = /\$([\d,]+(?:\.\d{1,2})?)/g;
+const STRIKETHROUGH_PRICE_RE = /~~\$([\d,]+(?:\.\d{1,2})?)~~/g;
+const TAKEN_RE = /domain taken|help you get it|broker service/i;
+const PREMIUM_RE = /\bpremium\b/i;
+const BUY_PRICE_RE = /Buy\s+\$([\d,]+(?:\.\d{1,2})?)/i;
+const PREMIUM_PRICE_THRESHOLD = 500;
+
+const INFRA_DOMAINS = new Set([
+  "dynadot.com", "godaddy.com", "porkbun.com", "namecheap.com",
+  "cloudflare.com", "name.com", "hover.com", "wsimg.com", "img6.wsimg.com",
+]);
 
 /**
- * TLDs we ask GoDaddy to price + verify. Mirrors the popular gTLDs other
- * registrars naturally surface — keeps result coverage comparable.
+ * Parse GoDaddy search markdown.
+ *
+ * Format:
+ *   Domain Taken             <- taken signal BEFORE domain
+ *   ## techstartup.com       <- domain as h2 heading
+ *   We might be able to help you get it
+ *   ---
+ *   ## techstartup.us        <- available domain
+ *   More Like This
+ *   $7.99~~$19.99~~          <- price with strikethrough original
  */
-const TLDS = [
-  "com", "net", "org", "io", "co", "dev", "app", "ai", "xyz", "me",
-  "info", "biz", "us", "tv", "online", "site", "tech", "store", "shop",
-  "club", "pro", "cloud", "live", "world",
-];
+export function parseGodaddyMarkdown(
+  markdown: string,
+  buildBuyUrl: (domain: string) => string,
+): RegistrarSearchHit[] {
+  const hits: RegistrarSearchHit[] = [];
+  const lines = markdown.split("\n");
+  const seen = new Set<string>();
 
-interface GoDaddyAvailability {
-  available: boolean;
-  currency: string;
-  domain: string;
-  period?: number;
-  /** Price in micros: divide by 1_000_000 for USD. */
-  price?: number;
-  definitive?: boolean;
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (!trimmed) continue;
+
+    const headingMatch = trimmed.match(HEADING_DOMAIN_RE);
+    if (!headingMatch) continue;
+
+    const domain = headingMatch[1].toLowerCase();
+    if (INFRA_DOMAINS.has(domain) || seen.has(domain)) continue;
+    seen.add(domain);
+
+    let backTaken = false;
+    let backCount = 0;
+    for (let j = i - 1; j >= 0 && j >= i - 6 && backCount < 4; j--) {
+      const bLine = lines[j].trim();
+      if (!bLine) continue;
+      if (/^-{3,}$/.test(bLine) || /^##\s/.test(bLine)) break;
+      backCount++;
+      if (TAKEN_RE.test(bLine)) { backTaken = true; break; }
+    }
+
+    let isTaken = backTaken;
+    let isPremium = false;
+    let registration: number | undefined;
+
+    for (let j = i + 1; j < lines.length && j <= i + 10; j++) {
+      const fwd = lines[j].trim();
+      if (!fwd) continue;
+
+      if (/^##\s/.test(fwd) || /^-{3,}$/.test(fwd)) break;
+
+      if (TAKEN_RE.test(fwd)) isTaken = true;
+      if (PREMIUM_RE.test(fwd) && !/non[- ]?premium/i.test(fwd) && !/premium\s*\(\d/i.test(fwd)) isPremium = true;
+
+      const buyMatch = fwd.match(BUY_PRICE_RE);
+      if (buyMatch) {
+        const val = parseFloat(buyMatch[1].replace(/,/g, ""));
+        if (!isNaN(val) && val > 0) {
+          registration = val;
+          if (val >= PREMIUM_PRICE_THRESHOLD) isPremium = true;
+        }
+      }
+
+      if (/you pay/i.test(fwd)) continue;
+      if (fwd.includes("$") && registration == null) {
+        const withoutStrike = fwd.replace(STRIKETHROUGH_PRICE_RE, "");
+
+        const prices: number[] = [];
+        let m: RegExpExecArray | null;
+        PRICE_RE.lastIndex = 0;
+        while ((m = PRICE_RE.exec(withoutStrike)) !== null) {
+          const val = parseFloat(m[1].replace(/,/g, ""));
+          if (!isNaN(val) && val > 0) prices.push(val);
+        }
+        if (prices.length > 0) {
+          registration = Math.min(...prices);
+        }
+      }
+    }
+
+    if (!isPremium && registration != null && registration >= PREMIUM_PRICE_THRESHOLD) {
+      isPremium = true;
+    }
+
+    const available = !isTaken && !isPremium && registration != null;
+
+    hits.push({
+      domain,
+      available,
+      explicitlyTaken: isTaken || undefined,
+      premium: isPremium || undefined,
+      registration,
+      currency: "USD",
+      buyUrl: buildBuyUrl(domain),
+    });
+  }
+
+  return hits;
 }
 
-interface GoDaddyBulkResponse {
-  domains: GoDaddyAvailability[];
-}
+const DEBUG_SCRAPE = process.env.DEBUG_SCRAPE === "1";
+
+// GoDaddy is on Akamai BMP Premier. Standard Firecrawl scrapes return the
+// 139-byte Akamai block in ~1.9s (IP/TLS fingerprint reject). The combination
+// that gets through: stealth proxy + persistent browser profile so the
+// `_abck` sensor cookie accumulates across requests and we look like a real
+// returning user. Verified across multiple unique queries in ~14-27s each.
+const GODADDY_FIRECRAWL_EXTRAS = {
+  proxy: "stealth" as const,
+  profile: { name: "godaddy-bypass", saveChanges: true },
+  timeoutMs: 60_000,
+};
 
 async function searchDomains(query: string): Promise<RegistrarSearchResult> {
+  const url = SEARCH_URL(query);
   const start = Date.now();
-  const key = process.env.GODADDY_API_KEY;
-  const secret = process.env.GODADDY_API_SECRET;
 
-  if (!key || !secret) {
-    return {
-      registrar: NAME,
-      hits: [],
-      fetchTimeMs: 0,
-      error: "GODADDY_API_KEY + GODADDY_API_SECRET missing — get from developer.godaddy.com",
-    };
-  }
-
-  const keyword = query.replace(/\..+$/, "").toLowerCase().trim();
-  if (!keyword) {
-    return { registrar: NAME, hits: [], fetchTimeMs: 0 };
-  }
-
-  // If the user typed a full domain with a non-popular TLD, include it too.
-  const tldMatch = query.match(/\.([a-z]{2,})(?:\.[a-z]{2,})?$/i);
-  const userTld = tldMatch?.[1].toLowerCase();
-  const tlds = userTld && !TLDS.includes(userTld) ? [userTld, ...TLDS] : TLDS;
-
-  const domains = tlds.map((t) => `${keyword}.${t}`);
-
-  console.log(`[${NAME}] Checking ${domains.length} TLDs via API`);
+  console.log(`[${NAME}] Scraping (stealth + profile): ${url}`);
 
   try {
-    const res = await fetch(API_BULK_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `sso-key ${key}:${secret}`,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(domains),
-      signal: AbortSignal.timeout(API_TIMEOUT_MS),
-    });
-
+    const result = await firecrawlScrape(
+      url,
+      6000,
+      process.env.FIRECRAWL_API_KEY_GODADDY ?? "",
+      GODADDY_FIRECRAWL_EXTRAS,
+    );
     const elapsed = Date.now() - start;
 
-    if (!res.ok) {
-      const body = await res.text();
-      const msg = `HTTP ${res.status} — ${body.slice(0, 200)}`;
-      console.log(`[${NAME}] FAILED in ${elapsed}ms — ${msg}`);
-      return { registrar: NAME, hits: [], fetchTimeMs: elapsed, error: msg };
+    if (!result.success || !result.markdown) {
+      console.log(`[${NAME}] FAILED in ${elapsed}ms — ${result.error ?? "no markdown"}`);
+      return { registrar: NAME, hits: [], fetchTimeMs: elapsed, error: result.error };
     }
 
-    const data = (await res.json()) as GoDaddyBulkResponse;
-    const hits: RegistrarSearchHit[] = [];
+    const lineCount = result.markdown.split("\n").filter(l => l.trim()).length;
+    console.log(`[${NAME}] Got ${lineCount} non-empty lines in ${elapsed}ms`);
 
-    for (const d of data.domains ?? []) {
-      // Skip non-definitive responses (GoDaddy isn't sure)
-      if (d.definitive === false) continue;
-      // Skip non-USD currency to match the rest of the pipeline
-      if (d.currency && d.currency !== "USD") continue;
-
-      const priceUsd = d.price != null ? d.price / 1_000_000 : undefined;
-      const isPremium = priceUsd != null && priceUsd >= 500;
-
-      hits.push({
-        domain: d.domain.toLowerCase(),
-        available: d.available && !isPremium,
-        explicitlyTaken: !d.available ? true : undefined,
-        premium: isPremium || undefined,
-        registration: priceUsd,
-        currency: "USD",
-        buyUrl: buildBuyUrl(d.domain),
-      });
+    if (DEBUG_SCRAPE) {
+      const preview = result.markdown.split("\n").filter(l => l.trim()).slice(0, 40);
+      for (const line of preview) console.log(`[${NAME}]   | ${line.slice(0, 120)}`);
     }
 
-    const avail = hits.filter((h) => h.available && !h.premium);
-    const taken = hits.filter((h) => !h.available && !h.premium);
-    const premium = hits.filter((h) => h.premium);
-    console.log(`[${NAME}] OK in ${elapsed}ms — ${hits.length} total · ${avail.length} avail · ${taken.length} taken · ${premium.length} premium`);
+    const hits = parseGodaddyMarkdown(result.markdown, buildBuyUrl);
 
-    if (avail.length > 0) {
-      const sample = avail.slice(0, 3).map((h) => `${h.domain} ($${h.registration ?? "?"})`).join(", ");
-      console.log(`[${NAME}] Sample: ${sample}`);
+    const available = hits.filter(h => h.available && !h.premium);
+    const taken = hits.filter(h => !h.available && !h.premium);
+    const premium = hits.filter(h => h.premium);
+    console.log(`[${NAME}] Parsed: ${hits.length} total — ${available.length} available, ${taken.length} taken, ${premium.length} premium`);
+
+    if (available.length > 0) {
+      const sample = available.slice(0, 3).map(h => `${h.domain} ($${h.registration ?? "?"})`).join(", ");
+      console.log(`[${NAME}] Sample available: ${sample}`);
     }
 
     return { registrar: NAME, hits, fetchTimeMs: elapsed };
   } catch (err) {
     const elapsed = Date.now() - start;
-    const msg = (err as Error).message;
-    console.log(`[${NAME}] EXCEPTION in ${elapsed}ms — ${msg}`);
-    return { registrar: NAME, hits: [], fetchTimeMs: elapsed, error: msg };
+    console.log(`[${NAME}] EXCEPTION in ${elapsed}ms — ${(err as Error).message}`);
+    return { registrar: NAME, hits: [], fetchTimeMs: elapsed, error: (err as Error).message };
   }
 }
 

@@ -87,8 +87,9 @@ export function parseNamecomMarkdown(
           if (!isNaN(val) && val > 0) prices.push(val);
         }
         if (prices.length > 0 && registration == null) {
-          // If two prices, the lower one is the sale price
-          registration = prices.length >= 2 ? Math.min(...prices) : prices[0];
+          // First price is the standalone registration price;
+          // second (lower) price is a bundled discount — use the real one.
+          registration = prices[0];
         }
       }
     }
