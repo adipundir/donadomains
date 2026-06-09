@@ -21,7 +21,7 @@ const bangers = Bangers({
 
 export const metadata: Metadata = {
   title: "Donadomains",
-  description: "Search domain availability and compare prices at GoDaddy, Namecheap, and more. Product of Donalabs.",
+  description: "Search domain availability and compare prices at GoDaddy, Namecheap, and more.",
 };
 
 export default function RootLayout({

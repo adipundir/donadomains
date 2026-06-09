@@ -1206,11 +1206,6 @@ export default function Home() {
       {intelDomain && (
         <DomainIntelPanel domain={intelDomain} onClose={() => setIntelDomain(null)} />
       )}
-
-      {/* ── Footer ── */}
-      <footer className={`flex items-center justify-center gap-1.5 ${!hasSearched ? 'py-2 sm:py-3' : 'py-5'}`}>
-        <span className="text-xs uppercase tracking-wide opacity-60">donalabs</span>
-      </footer>
     </div>
   );
 }
