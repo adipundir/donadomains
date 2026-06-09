@@ -1209,8 +1209,6 @@ export default function Home() {
 
       {/* ── Footer ── */}
       <footer className={`flex items-center justify-center gap-1.5 ${!hasSearched ? 'py-2 sm:py-3' : 'py-5'}`}>
-        <span className="text-xs uppercase tracking-wide opacity-60">a product of</span>
-        <img src="/D.svg" alt="Donalabs" className="h-4 w-4 opacity-60" />
         <span className="text-xs uppercase tracking-wide opacity-60">donalabs</span>
       </footer>
     </div>
