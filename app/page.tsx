@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTheme } from "next-themes";
 import { fetchDomainIntelAction, notifyDomainAction, valuateDomainAction } from "./actions";
-import type { DomainIntel, DomainResult, DomainRegistrationDetails, BuyLink, DomainValuation } from "./types";
+import type { DomainIntel, DomainResult, DomainValuation } from "./types";
 
 function ThemeSwitcher() {
   const { setTheme, resolvedTheme } = useTheme();
@@ -37,15 +37,6 @@ function formatDate(iso?: string): string {
   }
 }
 
-function daysUntil(iso?: string): number | null {
-  if (!iso) return null;
-  try {
-    const diff = new Date(iso).getTime() - Date.now();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
-  } catch {
-    return null;
-  }
-}
 
 const STATUS_LABELS: Record<string, string> = {
   clientTransferProhibited: "Transfer locked",
@@ -60,10 +51,6 @@ const STATUS_LABELS: Record<string, string> = {
   addPeriod: "Add period",
 };
 
-function formatStatus(status?: string[]): string {
-  if (!status?.length) return "";
-  return status.map((s) => STATUS_LABELS[s] || s).join(", ");
-}
 
 
 function SearchIcon({ className }: { className?: string }) {
@@ -145,8 +132,6 @@ function ValuationDisplay({ valuation }: { valuation: DomainValuation }) {
   );
 }
 
-const HOT_DOMAINS = ["coolstartup", "myportfolio.dev", "getapp.io", "brand.co", "shipped.app", "devtools.ai"];
-
 /* ── Domain Intel Panel (slide-over) ── */
 /* ── Watch Form (inside intel panel) ── */
 function NotifyForm({ domain }: { domain: string }) {
@@ -154,7 +139,7 @@ function NotifyForm({ domain }: { domain: string }) {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
     setStatus("loading");
@@ -563,7 +548,7 @@ export default function Home() {
     }
   }, [valuations]);
 
-  const handleSearch = useCallback(async (e?: React.FormEvent) => {
+  const handleSearch = useCallback(async (e?: React.SyntheticEvent) => {
     e?.preventDefault();
     if (!keyword.trim()) { setError("Enter a domain or keyword"); return; }
 
@@ -930,7 +915,7 @@ export default function Home() {
 
       {/* ── Pre-search landing ── */}
       {!hasSearched ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6">
+        <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 -mt-14">
           <div className="w-full max-w-xl text-center space-y-6 sm:space-y-8">
             <div className="space-y-3">
               <h1 className="font-comic-title text-4xl sm:text-5xl uppercase tracking-wide leading-tight">
@@ -947,21 +932,6 @@ export default function Home() {
               <p className="text-sm text-[var(--accent-red,#ff5252)]">{error}</p>
             )}
 
-            <div className="pt-2">
-              <p className="text-sm text-[var(--foreground)]/60 mb-3">Try searching</p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {HOT_DOMAINS.map((domain) => (
-                  <button
-                    key={domain}
-                    type="button"
-                    onClick={() => { setKeyword(domain); setError(null); }}
-                    className="px-3 py-1.5 text-sm border border-[var(--border-light)] bg-[var(--surface)] hover:border-[var(--border)] transition-colors"
-                  >
-                    {domain}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       ) : (
