@@ -1,156 +1,102 @@
-import type {
-  RegistrarModule,
-  RegistrarSearchResult,
-  RegistrarSearchHit,
-} from "./types";
-import { firecrawlScrape } from "./firecrawl-client";
+import type { RegistrarModule, RegistrarSearchResult, RegistrarSearchHit } from "./types";
 
 const NAME = "Name.com";
-
-const SEARCH_URL = (q: string) =>
-  `https://www.name.com/domain/search/${encodeURIComponent(q)}`;
-
-const DOMAIN_RE = /^([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.(?:[a-z]{2,}\.)?[a-z]{2,})$/i;
-const PRICE_RE = /\$([\d,]+(?:\.\d{1,2})?)/g;
-const RENEWAL_RE = /Renewal\s+\$([\d,]+(?:\.\d{1,2})?)/i;
-const TAKEN_RE = /\bMake Offer\b/i;
-const PREMIUM_RE = /\bpremium\b/i;
+const API_URL = "https://api.name.com/v4/domains:checkAvailability";
 const PREMIUM_PRICE_THRESHOLD = 500;
 
-const INFRA_DOMAINS = new Set([
-  "dynadot.com", "godaddy.com", "porkbun.com", "namecheap.com",
-  "cloudflare.com", "name.com", "hover.com",
-]);
+const POPULAR_TLDS = [
+  "com", "net", "org", "io", "co", "ai", "app", "dev", "xyz", "me",
+  "tech", "online", "site", "store", "info", "us", "club", "pro",
+  "cloud", "live", "shop", "blog", "tv", "world", "art",
+];
 
-/**
- * Parse Name.com search markdown.
- *
- * Format:
- *   techstartup.com          <- domain on its own line
- *   Make Offer               <- taken signal (skip)
- *   techstartup.video        <- next domain
- *   This domain free with Titan Email   <- ignorable
- *   $52.99$14.99Renewal $39.99          <- prices concatenated
- *
- * Taken: "Make Offer" on following line
- * Premium: "Premium" label, or price > $500
- */
-export function parseNamecomMarkdown(
-  markdown: string,
-  buildBuyUrl: (domain: string) => string,
-): RegistrarSearchHit[] {
-  const hits: RegistrarSearchHit[] = [];
-  const lines = markdown.split("\n");
-  const seen = new Set<string>();
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    if (!trimmed) continue;
-
-    const domainMatch = trimmed.match(DOMAIN_RE);
-    if (!domainMatch) continue;
-
-    const domain = domainMatch[1].toLowerCase();
-    if (INFRA_DOMAINS.has(domain) || seen.has(domain)) continue;
-    seen.add(domain);
-
-    let isTaken = false;
-    let isPremium = false;
-    let registration: number | undefined;
-    let renewal: number | undefined;
-
-    for (let j = i + 1; j < lines.length && j <= i + 8; j++) {
-      const fwd = lines[j].trim();
-      if (!fwd) continue;
-
-      // Stop if we hit the next domain
-      if (DOMAIN_RE.test(fwd)) break;
-
-      if (TAKEN_RE.test(fwd)) { isTaken = true; break; }
-      if (PREMIUM_RE.test(fwd) && !/non[- ]?premium/i.test(fwd)) isPremium = true;
-
-      // Extract renewal
-      const renewalMatch = fwd.match(RENEWAL_RE);
-      if (renewalMatch && renewal == null) {
-        renewal = parseFloat(renewalMatch[1].replace(/,/, ""));
-      }
-
-      // Extract prices — Name.com concatenates: "$52.99$14.99Renewal $39.99"
-      if (fwd.includes("$")) {
-        // Strip the renewal portion before extracting registration prices
-        const withoutRenewal = fwd.replace(/Renewal\s+\$[\d,.]+/i, "");
-        const prices: number[] = [];
-        let m: RegExpExecArray | null;
-        PRICE_RE.lastIndex = 0;
-        while ((m = PRICE_RE.exec(withoutRenewal)) !== null) {
-          const val = parseFloat(m[1].replace(/,/, ""));
-          if (!isNaN(val) && val > 0) prices.push(val);
-        }
-        if (prices.length > 0 && registration == null) {
-          // First price is the standalone registration price;
-          // second (lower) price is a bundled discount — use the real one.
-          registration = prices[0];
-        }
-      }
-    }
-
-    if (!isPremium && registration != null && registration >= PREMIUM_PRICE_THRESHOLD) {
-      isPremium = true;
-    }
-
-    const available = !isTaken && !isPremium && registration != null;
-
-    hits.push({
-      domain,
-      available,
-      explicitlyTaken: isTaken || undefined,
-      premium: isPremium || undefined,
-      registration,
-      renewal,
-      currency: "USD",
-      buyUrl: buildBuyUrl(domain),
-    });
-  }
-
-  return hits;
+interface NamecomResult {
+  domainName: string;
+  purchasable?: boolean;
+  premium?: boolean;
+  purchasePrice?: number;
+  renewalPrice?: number;
 }
 
-const DEBUG_SCRAPE = process.env.DEBUG_SCRAPE === "1";
+interface NamecomResponse {
+  results?: NamecomResult[];
+  message?: string;
+}
+
+function getKeyword(query: string): string {
+  const q = query.trim().toLowerCase().replace(/\s+/g, "-");
+  return q.includes(".") ? q.split(".")[0] : q;
+}
 
 async function searchDomains(query: string): Promise<RegistrarSearchResult> {
-  const url = SEARCH_URL(query);
-  const start = Date.now();
+  const username = process.env.NAMECOM_USERNAME;
+  const token = process.env.NAMECOM_API_TOKEN;
 
-  console.log(`[${NAME}] Scraping: ${url} (waitFor=2000ms)`);
+  if (!username || !token) {
+    return { registrar: NAME, hits: [], fetchTimeMs: 0, error: "NAMECOM_USERNAME or NAMECOM_API_TOKEN not set" };
+  }
+
+  const keyword = getKeyword(query);
+  const domainNames = POPULAR_TLDS.map((tld) => `${keyword}.${tld}`);
+  const start = Date.now();
+  const auth = Buffer.from(`${username}:${token}`).toString("base64");
+
+  console.log(`[${NAME}] API: ${domainNames.length} TLDs for "${keyword}"`);
 
   try {
-    const result = await firecrawlScrape(url, 2000, process.env.FIRECRAWL_API_KEY_NAMECOM ?? "");
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${auth}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ domainNames }),
+      signal: AbortSignal.timeout(25_000),
+    });
     const elapsed = Date.now() - start;
 
-    if (!result.success || !result.markdown) {
-      console.log(`[${NAME}] FAILED in ${elapsed}ms — ${result.error ?? "no markdown"}`);
-      return { registrar: NAME, hits: [], fetchTimeMs: elapsed, error: result.error };
+    if (!res.ok) {
+      const text = await res.text();
+      console.log(`[${NAME}] HTTP ${res.status} in ${elapsed}ms`);
+      return { registrar: NAME, hits: [], fetchTimeMs: elapsed, error: `HTTP ${res.status}: ${text.slice(0, 100)}` };
     }
 
-    const lineCount = result.markdown.split("\n").filter(l => l.trim()).length;
-    console.log(`[${NAME}] Got ${lineCount} non-empty lines in ${elapsed}ms`);
+    const data: NamecomResponse = await res.json();
 
-    if (DEBUG_SCRAPE) {
-      const preview = result.markdown.split("\n").filter(l => l.trim()).slice(0, 40);
-      for (const line of preview) console.log(`[${NAME}]   | ${line.slice(0, 120)}`);
+    if (!data.results) {
+      const msg = data.message ?? "No results returned";
+      console.log(`[${NAME}] Empty response in ${elapsed}ms — ${msg}`);
+      return { registrar: NAME, hits: [], fetchTimeMs: elapsed, error: msg };
     }
 
-    const hits = parseNamecomMarkdown(result.markdown, buildBuyUrl);
+    const hits: RegistrarSearchHit[] = [];
 
-    const available = hits.filter(h => h.available && !h.premium);
-    const taken = hits.filter(h => !h.available && !h.premium);
-    const premium = hits.filter(h => h.premium);
-    console.log(`[${NAME}] Parsed: ${hits.length} total — ${available.length} available, ${taken.length} taken, ${premium.length} premium`);
+    for (const r of data.results) {
+      const domain = r.domainName.toLowerCase();
+      const isAvailable = r.purchasable === true;
+      const isPremium = r.premium === true;
+      const registration = r.purchasePrice;
+      const renewal = r.renewalPrice;
 
-    if (available.length > 0) {
-      const sample = available.slice(0, 3).map(h => `${h.domain} ($${h.registration ?? "?"})`).join(", ");
-      console.log(`[${NAME}] Sample available: ${sample}`);
+      const effectivelyPremium =
+        isPremium || (registration != null && registration >= PREMIUM_PRICE_THRESHOLD);
+
+      hits.push({
+        domain,
+        available: isAvailable && !effectivelyPremium,
+        explicitlyTaken: !isAvailable && !effectivelyPremium ? true : undefined,
+        premium: effectivelyPremium || undefined,
+        registration,
+        renewal,
+        currency: "USD",
+        buyUrl: buildBuyUrl(domain),
+      });
     }
+
+    const avail = hits.filter((h) => h.available).length;
+    const taken = hits.filter((h) => !h.available && !h.premium).length;
+    const premium = hits.filter((h) => h.premium).length;
+    console.log(`[${NAME}] ${hits.length} results in ${elapsed}ms — ${avail} avail, ${taken} taken, ${premium} premium`);
 
     return { registrar: NAME, hits, fetchTimeMs: elapsed };
   } catch (err) {
